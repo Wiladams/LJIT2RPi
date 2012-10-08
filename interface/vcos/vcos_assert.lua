@@ -116,9 +116,6 @@ VideoCore OS Abstraction Layer - Assertion and error-handling macros.
  *    vcos_demand(*p++==GUARDWORDHEAP);
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #include "interface/vcos/vcos_types.h"
 
@@ -142,14 +139,7 @@ extern void __coverity_panic__(void);
 #define VCOS_ASSERT_BKPT __coverity_panic__()
 #endif
 
-/*
- * ANDROID should NOT be defined for files built for Videocore, but currently it
- * is. FIXME When that's fixed, remove the __VIDEOCORE__ band-aid.
- */
-#if (defined(ANDROID) && !defined(__VIDEOCORE__))
-#  include "assert.h"
-#  define vcos_assert assert
-#endif
+
 
 #ifndef VCOS_VERIFY_BKPTS
 #define VCOS_VERIFY_BKPTS vcos_verify_bkpts_enabled()
@@ -189,13 +179,9 @@ extern void logging_assert_dump(void);
 #define VCOS_VERIFY_MSG(...) VCOS_ASSERT_MSG(__VA_ARGS__)
 #endif
 
-#ifndef VCOS_ASSERT_LOGGING
-#define VCOS_ASSERT_LOGGING 0
-#endif
+VCOS_ASSERT_LOGGING = false
+VCOS_ASSERT_LOGGING_DISABLE = false
 
-#ifndef VCOS_ASSERT_LOGGING_DISABLE
-#define VCOS_ASSERT_LOGGING_DISABLE 0
-#endif
 
 #if !defined(NDEBUG) || defined(VCOS_RELEASE_ASSERTS)
 

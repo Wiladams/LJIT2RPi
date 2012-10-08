@@ -20,21 +20,22 @@ VideoCore OS Abstraction Layer - public header file
 
 --require "vcos_assert"
 require "vcos_types"
+require "vcos_platform"
+require "vcos_init"
+
 --[[
-require "vcos_platform.h"
-require "vcos_init.h"
-require "vcos_semaphore.h"
-require "vcos_thread.h"
-require "vcos_mutex.h"
-require "vcos_mem.h"
-require "vcos_logging.h"
-require "vcos_string.h"
-require "vcos_event.h"
-require "vcos_thread_attr.h"
-require "vcos_tls.h"
-require "vcos_reentrant_mutex.h"
-require "vcos_named_semaphore.h"
-require "vcos_quickslow_mutex.h"
+require "vcos_semaphore"
+require "vcos_thread"
+require "vcos_mutex"
+require "vcos_mem"
+require "vcos_logging"
+require "vcos_string"
+require "vcos_event"
+require "vcos_thread_attr"
+require "vcos_tls"
+require "vcos_reentrant_mutex"
+require "vcos_named_semaphore"
+require "vcos_quickslow_mutex"
 --]]
 
 --[[
