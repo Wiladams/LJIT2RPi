@@ -5,8 +5,10 @@
 local error, tostring, setmt = error, tostring, setmetatable
 local bit = require("bit")
 local band, bor, shl, shr = bit.band, bit.bor, bit.lshift, bit.rshift
+
 local ffi = require("ffi")
 local C = ffi.C
+
 require "syscall"
 
 

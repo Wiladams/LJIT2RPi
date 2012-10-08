@@ -1,3 +1,5 @@
+package.path = package.path..";interface/vctypes/?.lua;interface/vchi/?.lua;interface/vcos/?.lua;interface/vcos/pthreads/?.lua;interface/vmcs_host/?.lua"
+
 local ffi = require "ffi"
 
 ffi.cdef [[
@@ -34,8 +36,11 @@ local GetDisplaySize = function(display_number)
 	return pWidth[0], pHeight[0];
 end
 
+
+require "vc_dispmanx"
+
 --[[
-require "interface/vmcs_host/vc_dispmanx"
+
 require "interface/vmcs_host/vc_tvservice"
 require "interface/vmcs_host/vc_cec"
 require "interface/vmcs_host/vc_cecservice"
@@ -47,3 +52,4 @@ return {
 
 	GetDisplaySize = GetDisplaySize,
 }
+
