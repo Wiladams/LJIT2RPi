@@ -12,20 +12,6 @@ VCOS_VERSION   = 1
 require "pthreads/vcos_platform_types"
 require "pthreads/vcos_platform"
 
---[[
-
-
-/* Redefine these here; this means that existing header files can carry on
- * using the VCHPOST/VCHPRE macros rather than having huge changes, which
- * could cause nasty merge problems.
- */
-#ifndef VCHPOST_
-#define VCHPOST_ VCOSPOST_
-#endif
-#ifndef VCHPRE_
-#define VCHPRE_  VCOSPRE_
-#endif
---]]
 
 ffi.cdef[[
 /** Entry function for a lowlevel thread.

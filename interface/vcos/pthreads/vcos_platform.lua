@@ -17,7 +17,6 @@ VideoCore OS Abstraction Layer - pthreads types
 #include <sys/types.h>
 #include <sched.h>
 #include <errno.h>
-#include <unistd.h>
 #include <string.h>
 #include <strings.h>
 #include <time.h>
