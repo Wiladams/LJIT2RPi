@@ -18,13 +18,13 @@ VideoCore OS Abstraction Layer - public header file
 --]]
 
 
---require "vcos_assert"
+require "vcos_assert"
 require "vcos_types"
 require "vcos_platform"
 require "vcos_init"
+require "vcos_semaphore"
 
 --[[
-require "vcos_semaphore"
 require "vcos_thread"
 require "vcos_mutex"
 require "vcos_mem"
