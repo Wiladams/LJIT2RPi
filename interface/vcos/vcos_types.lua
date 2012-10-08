@@ -9,7 +9,8 @@ VideoCore OS Abstraction Layer - basic types
 
 VCOS_VERSION   = 1
 
---require "vcos_platform_types"
+require "pthreads/vcos_platform_types"
+require "pthreads/vcos_platform"
 
 --[[
 

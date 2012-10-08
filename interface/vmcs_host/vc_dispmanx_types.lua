@@ -1,11 +1,12 @@
 
+local ffi = require "ffi"
 
 -- Typedefs and enums for the VideoCore III Display Manager
 
 
 
-require "../vctypes/vc_image_types.h"
-require "../vctypes/vc_display_types.h"
+require "vc_image_types"
+require "vc_display_types"
 
 ffi.cdef[[
 /* Opaque handles */
@@ -15,24 +16,28 @@ typedef uint32_t DISPMANX_ELEMENT_HANDLE_T;
 typedef uint32_t DISPMANX_RESOURCE_HANDLE_T;
 
 typedef uint32_t DISPMANX_PROTECTION_T;
+]]
 
-#define DISPMANX_NO_HANDLE 0
+DISPMANX_NO_HANDLE =0
 
-#define DISPMANX_PROTECTION_MAX   0x0f
-#define DISPMANX_PROTECTION_NONE  0
-#define DISPMANX_PROTECTION_HDCP  11   // Derived from the WM DRM levels, 101-300
+DISPMANX_PROTECTION_MAX   =0x0f
+DISPMANX_PROTECTION_NONE  =0
+DISPMANX_PROTECTION_HDCP  =11   -- Derived from the WM DRM levels, 101-300
 
 
 
-/* Default display IDs.
+--[[
+ Default display IDs.
    Note: if you overwrite with you own dispmanx_platfrom_init function, you
    should use IDs you provided during dispmanx_display_attach.
-*/
-#define DISPMANX_ID_MAIN_LCD  0
-#define DISPMANX_ID_AUX_LCD   1
-#define DISPMANX_ID_HDMI      2
-#define DISPMANX_ID_SDTV      3
+--]]
 
+DISPMANX_ID_MAIN_LCD  =0;
+DISPMANX_ID_AUX_LCD   =1;
+DISPMANX_ID_HDMI      =2;
+DISPMANX_ID_SDTV      =3;
+
+ffi.cdef[[
 /* Return codes. Nonzero ones indicate failure. */
 typedef enum {
   DISPMANX_SUCCESS      = 0,
@@ -73,17 +78,16 @@ typedef struct {
   uint32_t opacity;
   DISPMANX_RESOURCE_HANDLE_T mask;
 } VC_DISPMANX_ALPHA_T;  /* for use with vmcs_host */
+]]
 
+ffi.cdef[[
 typedef enum {
   DISPMANX_FLAGS_CLAMP_NONE = 0,
   DISPMANX_FLAGS_CLAMP_LUMA_TRANSPARENT = 1,
-#if __VCCOREVER__ >= 0x04000000
-  DISPMANX_FLAGS_CLAMP_TRANSPARENT = 2,
-  DISPMANX_FLAGS_CLAMP_REPLACE = 3
-#else
+  //DISPMANX_FLAGS_CLAMP_TRANSPARENT = 2,
+  DISPMANX_FLAGS_CLAMP_REPLACE = 3,
   DISPMANX_FLAGS_CLAMP_CHROMA_TRANSPARENT = 2,
-  DISPMANX_FLAGS_CLAMP_TRANSPARENT = 3
-#endif
+  DISPMANX_FLAGS_CLAMP_TRANSPARENT = 3,
 } DISPMANX_FLAGS_CLAMP_T;
 
 typedef enum {
@@ -126,7 +130,9 @@ typedef struct {
   VC_IMAGE_TRANSFORM_T transform;
   DISPLAY_INPUT_FORMAT_T input_format;
 } DISPMANX_MODEINFO_T;
+]]
 
+ffi.cdef[[
 /* Update callback. */
 typedef void (*DISPMANX_CALLBACK_FUNC_T)(DISPMANX_UPDATE_HANDLE_T u, void * arg);
 

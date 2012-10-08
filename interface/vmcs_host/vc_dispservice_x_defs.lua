@@ -1,18 +1,24 @@
 local ffi = require "ffi"
+local bit = require "bit"
+local bnot = bit.bnot
+local band = bit.band
 
 -- Display service command enumeration.
 
 
-require "../vctypes/vc_image_types.h"
+require "vc_image_types"
+
+HOST_PITCH_ALIGNMENT   = 4
+
+-- Round up to the nearest multiple of 16
+PAD16 = function(x) 
+	return band(x + (VC_INTERFACE_BLOCK_SIZE-1), bnot(VC_INTERFACE_BLOCK_SIZE-1))
+end
+
+-- The max length for an effect name
+DISPMANX_MAX_EFFECT_NAME  = 28
 
 ffi.cdef[[
-#define  HOST_PITCH_ALIGNMENT    4
-
-//Round up to the nearest multiple of 16
-#define  PAD16(x) (((x) + (VC_INTERFACE_BLOCK_SIZE-1)) & ~(VC_INTERFACE_BLOCK_SIZE-1))
-
-//The max length for an effect name
-#define DISPMANX_MAX_EFFECT_NAME  (28)
 
 // Should really use the VC_IMAGE_TYPE_T, but this one has been extended
 // to force it up to 32-bits...
@@ -37,23 +43,19 @@ typedef enum {
    /* To force 32-bit storage, enabling use in structures over-the-wire */
    VC_FORMAT_RANGE_MAX = 0x7FFFFFFF
 } VC_IMAGE_FORMAT_T;
+]]
 
-// Transforms.
-/* Image transformations. These must match the DISPMAN and Media Player versions */
-#define TRANSFORM_HFLIP     (1<<0)
-#define TRANSFORM_VFLIP     (1<<1)
-#define TRANSFORM_TRANSPOSE (1<<2)
+VC_DISPMAN_ROT0 = VC_IMAGE_ROT0;
+VC_DISPMAN_ROT90 = VC_IMAGE_ROT90;
+VC_DISPMAN_ROT180 = VC_IMAGE_ROT180;
+VC_DISPMAN_ROT270 = VC_IMAGE_ROT270;
+VC_DISPMAN_MIRROR_ROT0 = VC_IMAGE_MIRROR_ROT0;
+VC_DISPMAN_MIRROR_ROT90 = VC_IMAGE_MIRROR_ROT90;
+VC_DISPMAN_MIRROR_ROT180 = VC_IMAGE_MIRROR_ROT180;
+VC_DISPMAN_MIRROR_ROT270 = VC_IMAGE_MIRROR_ROT270;
+VC_DISPMAN_TRANSFORM_T = VC_IMAGE_TRANSFORM_T;
 
-#define VC_DISPMAN_ROT0 VC_IMAGE_ROT0
-#define VC_DISPMAN_ROT90 VC_IMAGE_ROT90
-#define VC_DISPMAN_ROT180 VC_IMAGE_ROT180
-#define VC_DISPMAN_ROT270 VC_IMAGE_ROT270
-#define VC_DISPMAN_MIRROR_ROT0 VC_IMAGE_MIRROR_ROT0
-#define VC_DISPMAN_MIRROR_ROT90 VC_IMAGE_MIRROR_ROT90
-#define VC_DISPMAN_MIRROR_ROT180 VC_IMAGE_MIRROR_ROT180
-#define VC_DISPMAN_MIRROR_ROT270 VC_IMAGE_MIRROR_ROT270
-#define VC_DISPMAN_TRANSFORM_T VC_IMAGE_TRANSFORM_T
-
+ffi.cdef[[
 typedef enum {
    VC_RESOURCE_TYPE_HOST,
    VC_RESOURCE_TYPE_VIDEOCORE,
@@ -101,15 +103,19 @@ typedef enum {
    // new features - add to end of list
    VC_CMD_END_OF_LIST
 } VC_CMD_CODE_T;
+]]
 
+ffi.cdef[[
 /* The table of functions executed for each command. */
 
 typedef void (*INTERFACE_EXECUTE_FN_T)(int, int);
 
-extern INTERFACE_EXECUTE_FN_T interface_execute_fn[];
+//extern INTERFACE_EXECUTE_FN_T interface_execute_fn[];
+]]
 
-#define DISPMANX_MAX_HOST_DEVICES 8
-#define DISPMANX_MAX_DEVICE_NAME_LEN 16
+ffi.cdef[[
+static const int DISPMANX_MAX_HOST_DEVICES = 8;
+static const int DISPMANX_MAX_DEVICE_NAME_LEN = 16;
 
 //Parameter sets for dispservice commands
 
@@ -119,58 +125,70 @@ typedef struct {
    uint32_t dummy[2];
    uint8_t names[DISPMANX_MAX_HOST_DEVICES][DISPMANX_MAX_DEVICE_NAME_LEN];
 } DISPMANX_GET_DEVICES_RESP_T;
+
 typedef struct {
    uint32_t device;
    uint32_t dummy[3];   //Pad to multiple of 16 bytes
 } DISPMANX_GET_MODES_PARAM_T;
+
 typedef struct {
    uint32_t display;
    uint32_t mode;
    uint32_t dummy[2];   //Pad to multiple of 16 bytes
 } DISPMANX_GET_MODE_INFO_PARAM_T;
+
 typedef struct {
    uint32_t type;
    uint32_t width;
    uint32_t height;
    uint32_t dummy[1];   // Pad to multiple of 16 bytes
 } DISPMANX_RESOURCE_CREATE_PARAM_T;
+
 typedef struct {
    // This will be needed when we change to vchi.
    int junk; // empty structure not allowed
 } DISPMANX_RESOURCE_WRITE_DATA_PARAM_T;
+
 typedef struct {
    uint32_t handle;
    uint32_t dummy[3];   //Pad to multiple of 16 bytes
 } DISPMANX_RESOURCE_DELETE_PARAM_T;
+
 typedef struct {
    uint32_t device;
    uint32_t dummy[3];
 } DISPMANX_DISPLAY_OPEN_PARAM_T;
+
 typedef struct {
    uint32_t device;
    uint32_t mode;
    uint32_t dummy[2];
 } DISPMANX_DISPLAY_OPEN_MODE_PARAM_T;
+
 typedef struct {
    uint32_t dest;
    uint32_t orientation;
    uint32_t dummy[2];
 } DISPMANX_DISPLAY_OPEN_OFFSCREEN_PARAM_T;
+
 typedef struct {
    uint32_t display;
    uint32_t dest;
    uint32_t dummy[2];
 } DISPMANX_DISPLAY_SET_DESTINATION_PARAM_T;
+
 typedef struct {
    uint32_t display;
    uint32_t update;
    uint32_t colour;
    uint32_t dummy;
 } DISPMANX_DISPLAY_SET_BACKGROUND_PARAM_T;
+
 typedef struct {
    uint32_t display;
    uint32_t dummy[3];
 } DISPMANX_DISPLAY_GET_INFO_PARAM_T;
+
 typedef struct {
    uint32_t read_response;
    int32_t      width;
@@ -183,10 +201,12 @@ typedef struct {
    uint32_t transform;
    uint32_t dummy[3];
 } DISPMANX_DISPLAY_GET_INFO_RESP_T;
+
 typedef struct {
    int32_t priority;
    uint32_t dummy[3];
 } DISPMANX_UPDATE_START_PARAM_T;
+
 typedef struct {
    uint32_t update;
    uint32_t display;
@@ -206,12 +226,14 @@ typedef struct {
    uint32_t mask_resource;
    // already 16 byte aligned
 } DISPMANX_ELEMENT_ADD_PARAM_T;
+
 typedef struct {
    uint32_t update;
    uint32_t element;
    uint32_t src_resource;
    uint32_t dummy; // pad to 16 bytes
 } DISPMANX_ELEMENT_CHANGE_SOURCE_PARAM_T;
+
 typedef struct {
    uint32_t update;
    uint32_t element;
@@ -220,32 +242,42 @@ typedef struct {
    uint16_t width;
    uint16_t height;
 } DISPMANX_ELEMENT_MODIFIED_PARAM_T;
+
 typedef struct {
    uint32_t update;
    uint32_t element;
    uint32_t dummy[2];
 } DISPMANX_ELEMENT_REMOVE_PARAM_T;
+
 typedef struct {
    uint32_t update;
    uint32_t dummy[3];
 } DISPMANX_UPDATE_SUBMIT_PARAM_T;
+
 typedef struct {
    uint32_t update;
    uint32_t dummy[3];
 } DISPMANX_UPDATE_SUBMIT_SYNC_PARAM_T;
+
 typedef struct {
    uint32_t display;
    uint32_t snapshot_resource;
    uint32_t transform;
    uint32_t dummy[1];
 } DISPMANX_DISPLAY_SNAPSHOT_PARAM_T;
-
-// for dispmanx
-
-#define TRANSFORM_HFLIP     (1<<0)
-#define TRANSFORM_VFLIP     (1<<1)
-#define TRANSFORM_TRANSPOSE (1<<2)
-
-
 ]]
+
+--[=[
+ffi.cdef[[
+/* Image transformations. These must match the DISPMAN and Media Player versions */
+
+static const int TRANSFORM_HFLIP     = 0x01;	
+static const int TRANSFORM_VFLIP     = 0x02;	
+static const int TRANSFORM_TRANSPOSE = 0x04;	
+]]
+--]=]
+
+TRANSFORM_HFLIP     = 0x01;	
+TRANSFORM_VFLIP     = 0x02;	
+TRANSFORM_TRANSPOSE = 0x04;	
 

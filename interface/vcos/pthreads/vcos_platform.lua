@@ -26,37 +26,46 @@ VideoCore OS Abstraction Layer - pthreads types
 #include <stdlib.h>
 --]]
 
-VCOS_HAVE_RTOS         =true
-VCOS_HAVE_SEMAPHORE    = true
-VCOS_HAVE_EVENT        = true
-VCOS_HAVE_QUEUE        = false
-VCOS_HAVE_LEGACY_ISR   = false
-VCOS_HAVE_TIMER        = true
-VCOS_HAVE_CANCELLATION_SAFE_TIMER  = true
-VCOS_HAVE_MEMPOOL      = false
-VCOS_HAVE_ISR          = false
-VCOS_HAVE_ATOMIC_FLAGS = true
-VCOS_HAVE_THREAD_AT_EXIT        = true
-VCOS_HAVE_ONCE         = true
-VCOS_HAVE_BLOCK_POOL   = true
-VCOS_HAVE_FILE         = false
-VCOS_HAVE_PROC         = false
-VCOS_HAVE_CFG          = false
-VCOS_HAVE_ALIEN_THREADS  = true
-VCOS_HAVE_CMD          = true
-VCOS_HAVE_EVENT_FLAGS  = true
-VCOS_WANT_LOG_CMD      = false    -- User apps should do their own thing
+VCOS_HAVE_RTOS         	= true;
+VCOS_HAVE_SEMAPHORE    	= true;
+VCOS_HAVE_EVENT        	= true;
+VCOS_HAVE_QUEUE        	= false;
+VCOS_HAVE_LEGACY_ISR   	= false;
+VCOS_HAVE_TIMER        	= true;
+VCOS_HAVE_CANCELLATION_SAFE_TIMER  = true;
+VCOS_HAVE_MEMPOOL      	= false;
+VCOS_HAVE_ISR          	= false;
+VCOS_HAVE_ATOMIC_FLAGS 	= true;
+VCOS_HAVE_THREAD_AT_EXIT        = true;
+VCOS_HAVE_ONCE         	= true;
+VCOS_HAVE_BLOCK_POOL   	= true;
+VCOS_HAVE_FILE         	= false;
+VCOS_HAVE_PROC         	= false;
+VCOS_HAVE_CFG          	= false;
+VCOS_HAVE_ALIEN_THREADS = true;
+VCOS_HAVE_CMD          	= true;
+VCOS_HAVE_EVENT_FLAGS	= true;
+VCOS_WANT_LOG_CMD      	= false;    -- User apps should do their own thing
 
-VCOS_ALWAYS_WANT_LOGGING = false
+VCOS_ALWAYS_WANT_LOGGING = false;
 
-VCOS_HAVE_BACKTRACE     = true
+VCOS_HAVE_BACKTRACE     = true;
 
 VCOS_SO_EXT  = ".so";
 
-/* Linux/pthreads seems to have different timer characteristics */
-VCOS_TIMER_MARGIN_EARLY = 0
-VCOS_TIMER_MARGIN_LATE  = 15
+-- Linux/pthreads seems to have different timer characteristics
+VCOS_TIMER_MARGIN_EARLY = 0;
+VCOS_TIMER_MARGIN_LATE  = 15;
 
+--BUGBUG
+VCOS_TICKS_PER_SECOND = 30
+--[[
+VCOS_TICKS_PER_SECOND = function()
+	return _vcos_get_ticks_per_second();
+end
+--]]
+
+--[===[
 ffi.cdef[[
 typedef sem_t                 VCOS_SEMAPHORE_T;
 typedef uint32_t              VCOS_UNSIGNED;
@@ -157,7 +166,7 @@ typedef struct VCOS_THREAD_T
 } VCOS_THREAD_T;
 ]]
 
-if VCOS_PTHREADS_WANT_HISR_EMULATION
+if VCOS_PTHREADS_WANT_HISR_EMULATION then
 ffi.cdef[[
 typedef struct
 {
@@ -167,6 +176,7 @@ typedef struct
 } VCOS_HISR_T;
 ]]
 end
+
 
 VCOS_SUSPEND			= -1;
 VCOS_NO_SUSPEND			= 0;
@@ -190,15 +200,17 @@ _VCOS_AFFINITY_CPU0    =0x100
 _VCOS_AFFINITY_CPU1    =0x200
 _VCOS_AFFINITY_MASK    =0x300
 VCOS_CAN_SET_STACK_ADDR  =0
+--]===]
 
-VCOS_TICKS_PER_SECOND = function()
-	return _vcos_get_ticks_per_second();
-end
 
+
+--[[
 require "interface/vcos/generic/vcos_generic_event_flags.h"
 require "interface/vcos/generic/vcos_generic_blockpool.h"
 require "interface/vcos/generic/vcos_mem_from_malloc.h"
+--]]
 
+--[==[
 ffi.cdef[[
 /** Convert errno values into the values recognized by vcos */
 VCOSPRE_ VCOS_STATUS_T vcos_pthreads_map_error(int error);
@@ -705,7 +717,7 @@ char *vcos_strdup(const char *str)
 }
 
 typedef void (*VCOS_ISR_HANDLER_T)(VCOS_UNSIGNED vecnum);
-
+--]==]
 
 
 --[[
