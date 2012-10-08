@@ -1,5 +1,5 @@
 
-
+package.path = package.path..";pthreads/?.lua;"
 --[[
 =============================================================================
 VideoCore OS Abstraction Layer - public header file
@@ -18,22 +18,24 @@ VideoCore OS Abstraction Layer - public header file
 --]]
 
 
-require "../vcos/vcos_assert.h"
-require "vcos_types.h"
+--require "vcos_assert"
+require "vcos_types"
+--[[
 require "vcos_platform.h"
-require "../vcos/vcos_init.h"
-require "../vcos/vcos_semaphore.h"
-require "../vcos/vcos_thread.h"
-require "../vcos/vcos_mutex.h"
-require "../vcos/vcos_mem.h"
-require "../vcos/vcos_logging.h"
-require "../vcos/vcos_string.h"
-require "../vcos/vcos_event.h"
-require "../vcos/vcos_thread_attr.h"
-require "../vcos/vcos_tls.h"
-require "../vcos/vcos_reentrant_mutex.h"
-require "../vcos/vcos_named_semaphore.h"
-require "../vcos/vcos_quickslow_mutex.h"
+require "vcos_init.h"
+require "vcos_semaphore.h"
+require "vcos_thread.h"
+require "vcos_mutex.h"
+require "vcos_mem.h"
+require "vcos_logging.h"
+require "vcos_string.h"
+require "vcos_event.h"
+require "vcos_thread_attr.h"
+require "vcos_tls.h"
+require "vcos_reentrant_mutex.h"
+require "vcos_named_semaphore.h"
+require "vcos_quickslow_mutex.h"
+--]]
 
 --[[
 -- Headers with predicates

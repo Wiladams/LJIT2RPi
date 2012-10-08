@@ -1,4 +1,5 @@
 
+local ffi = require "ffi"
 
 --[[
 =============================================================================
@@ -8,12 +9,10 @@ VideoCore OS Abstraction Layer - basic types
 
 VCOS_VERSION   = 1
 
-require "vcos_platform_types"
+--require "vcos_platform_types"
 
 --[[
-#if !defined(VCOSPRE_) || !defined(VCOSPOST_)
-#error VCOSPRE_ and VCOSPOST_ not defined!
-#endif
+
 
 /* Redefine these here; this means that existing header files can carry on
  * using the VCHPOST/VCHPRE macros rather than having huge changes, which
@@ -176,8 +175,19 @@ typedef struct vcos_datestr
 VCOS_CASSERT = function(e) return vcos_compile_time_check[1/(e)] end
 
 
-vcos_min = function(x,y) return if x < y then return x end return y end
-vcos_max = function(x,y) return if x > y then return x end return y end
+vcos_min = function(x,y) 
+	if x < y then 
+		return x 
+	end 
+	return y 
+end
+
+vcos_max = function(x,y) 
+	if x > y then 
+		return x 
+	end 
+	return y 
+end
 
 
 --[[ 

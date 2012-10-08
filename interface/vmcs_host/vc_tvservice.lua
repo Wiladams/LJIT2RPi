@@ -10,11 +10,11 @@ local ffi = require "ffi"
 --]]
 
 require "common"
-#include "interface/vcos/vcos.h"
-#include "interface/vchi/vchi.h"
-#include "interface/vmcs_host/vc_tvservice_defs.h"
-#include "interface/vmcs_host/vc_hdmi.h"
-#include "interface/vmcs_host/vc_sdtv.h"
+require "interface/vcos/vcos."
+require "interface/vchi/vchi"
+require "interface/vmcs_host/vc_tvservice_defs"
+require "interface/vmcs_host/vc_hdmi"
+require "interface/vmcs_host/vc_sdtv"
 
 
 ffi.cdef[[
