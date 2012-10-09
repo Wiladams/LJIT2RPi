@@ -6,7 +6,7 @@ local bit = require "bit"
 local bcm = require "bcm_host"
 
 
-print(bcm.GetDisplaySize());
+--print(bcm.GetDisplaySize());
 
 
 

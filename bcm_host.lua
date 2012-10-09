@@ -9,7 +9,7 @@ void bcm_host_deinit(void);
 int32_t graphics_get_display_size( const uint16_t display_number, uint32_t *width, uint32_t *height);
 ]]
 
---local lib = ffi.load("bcm_host");
+local lib = ffi.load("bcm_host");
 
 --[[
 	The bcm_host_init() function must be called
@@ -19,7 +19,7 @@ int32_t graphics_get_display_size( const uint16_t display_number, uint32_t *widt
 		require "bcm_host"
 --]]
 
---lib.bcm_host_init();
+lib.bcm_host_init();
 
 local GetDisplaySize = function(display_number)
 	display_number = display_number or 0
