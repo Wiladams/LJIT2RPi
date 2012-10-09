@@ -2,46 +2,102 @@
 local ffi = require "ffi"
 
 -- Display manager service API
+local host = require "BcmHost"
+local Native = host.Lib
 
-require "vcos"
-require "vc_image_types"
-require "vc_dispservice_x_defs"
-require "vc_dispmanx_types"
-require "vchi"
+-- Initialize module
+Native.vc_dispman_init();
+-- Call this instead of vc_dispman_init
+--Native.vc_vchi_dispmanx_init (VCHI_INSTANCE_T initialise_instance, VCHI_CONNECTION_T **connections, uint32_t num_connections );
 
+DisplayManX = {
+	rect_set = function(rect, x_offset, y_offset, width, height )
+		local result = Native.vc_dispmanx_rect_set( rect, x_offset, y_offset, width, height );
+		if result == 0 then 
+			return true
+		end
+	
+		return false, result
+	end,
+	
+	resource_create = function(imgtype, width, height, native_image_handle)
+		local nativehandle = ffi.new("int32_t[1]", nativeimage_handle);
+		local handle = Native.vc_dispmanx_resource_create( imagetype, width, height, nativehandle );
+		
+		return handle
+	end,
+
+	-- Write the bitmap data to VideoCore memory
+	resource_write_data = function(res, src_type, src_pitch, src_address, rect)
+		local result = Native.vc_dispmanx_resource_write_data(res, src_type, src_pitch, src_address, rect );
+	
+		if result == 0 then
+			return true
+		end
+		
+		return false, result
+	end,
+	
+	resource_write_data_handle = function(res, src_type, src_pitch,handle, offset, rect )
+		local result = Native.vc_dispmanx_resource_write_data_handle( res, src_type, src_pitch, handle, offset, rect );
+	
+		if result == 0 then
+			return true
+		end
+		
+		return false, result;
+	end,
+	
+	resource_read_data = function(handle, p_rect,dst_address,dst_pitch)
+		local result = Native.vc_dispmanx_resource_read_data(handle, p_rect,dst_address,dst_pitch );
+		if result == 0 then 
+			return true
+		end
+		
+		return false, result;
+	end,
+	
+	-- Delete a resource
+	resource_delete = function(res)
+		local result = Native.vc_dispmanx_resource_delete( res );
+		if result == 0 then
+			return true;
+		end
+		
+		return false, result;
+	end,
+
+	-- Displays
+	-- Opens a display on the given device
+	display_open = function(device)
+		local handle =  Native.vc_dispmanx_display_open( device );
+		return handle;
+	end,
+
+	-- Opens a display on the given device in the request mode
+	display_open_mode = function(device, mode)
+		local handle = Native.vc_dispmanx_display_open_mode( device, mode );
+		return handle;
+	end,
+
+	-- Open an offscreen display
+	display_open_offscreen = function(dest, orientation)
+		local handle = Native.vc_dispmanx_display_open_offscreen( dest, orientation );
+		return handle;
+	end,
+	
+}
+
+
+--[=[
 ffi.cdef[[
-// Same function as above, to aid migration of code.
-int vc_dispman_init( void );
 
 // Stop the service from being used
 void vc_dispmanx_stop( void );
 
-// Set the entries in the rect structure
-int vc_dispmanx_rect_set( VC_RECT_T *rect, uint32_t x_offset, uint32_t y_offset, uint32_t width, uint32_t height );
 
-// Resources
-// Create a new resource
-DISPMANX_RESOURCE_HANDLE_T vc_dispmanx_resource_create( VC_IMAGE_TYPE_T type, uint32_t width, uint32_t height, uint32_t *native_image_handle );
 
-// Write the bitmap data to VideoCore memory
-int vc_dispmanx_resource_write_data( DISPMANX_RESOURCE_HANDLE_T res, VC_IMAGE_TYPE_T src_type, int src_pitch, void * src_address, const VC_RECT_T * rect );
-int vc_dispmanx_resource_write_data_handle( DISPMANX_RESOURCE_HANDLE_T res, VC_IMAGE_TYPE_T src_type, int src_pitch, VCHI_MEM_HANDLE_T handle, uint32_t offset, const VC_RECT_T * rect );
-int vc_dispmanx_resource_read_data(DISPMANX_RESOURCE_HANDLE_T handle,
-                              const VC_RECT_T* p_rect,
-                              void *   dst_address,
-                              uint32_t dst_pitch );
-// Delete a resource
-int vc_dispmanx_resource_delete( DISPMANX_RESOURCE_HANDLE_T res );
 
-// Displays
-// Opens a display on the given device
-DISPMANX_DISPLAY_HANDLE_T vc_dispmanx_display_open( uint32_t device );
-
-// Opens a display on the given device in the request mode
-DISPMANX_DISPLAY_HANDLE_T vc_dispmanx_display_open_mode( uint32_t device, uint32_t mode );
-
-// Open an offscreen display
-DISPMANX_DISPLAY_HANDLE_T vc_dispmanx_display_open_offscreen( DISPMANX_RESOURCE_HANDLE_T dest, VC_IMAGE_TRANSFORM_T orientation );
 
 // Change the mode of a display
 int vc_dispmanx_display_reconfigure( DISPMANX_DISPLAY_HANDLE_T display, uint32_t mode );
@@ -103,8 +159,6 @@ int vc_dispmanx_element_change_attributes( DISPMANX_UPDATE_HANDLE_T update,
 //xxx hack to get the image pointer from a resource handle, will be obsolete real soon
 uint32_t vc_dispmanx_resource_get_image_handle( DISPMANX_RESOURCE_HANDLE_T res);
 
-//Call this instead of vc_dispman_init
-void vc_vchi_dispmanx_init (VCHI_INSTANCE_T initialise_instance, VCHI_CONNECTION_T **connections, uint32_t num_connections );
 
 // Take a snapshot of a display in its current state.
 // This call may block for a time; when it completes, the snapshot is ready.
@@ -112,4 +166,4 @@ int vc_dispmanx_snapshot( DISPMANX_DISPLAY_HANDLE_T display,
                                            DISPMANX_RESOURCE_HANDLE_T snapshot_resource, 
                                            VC_IMAGE_TRANSFORM_T transform );
 ]]
-
+--]=]

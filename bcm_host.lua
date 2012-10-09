@@ -9,6 +9,7 @@ void bcm_host_deinit(void);
 int32_t graphics_get_display_size( const uint16_t display_number, uint32_t *width, uint32_t *height);
 ]]
 
+<<<<<<< HEAD
 local lib = ffi.load("bcm_host");
 
 --[[
@@ -36,6 +37,8 @@ local GetDisplaySize = function(display_number)
 	return pWidth[0], pHeight[0];
 end
 
+=======
+>>>>>>> Level 2 simplifaction API
 
 require "vc_dispmanx"
 
@@ -47,9 +50,5 @@ require "interface/vmcs_host/vc_cecservice"
 require "interface/vmcs_host/vcgencmd"
 --]]
 
-return {
-	Lib = lib,
 
-	GetDisplaySize = GetDisplaySize,
-}
 
