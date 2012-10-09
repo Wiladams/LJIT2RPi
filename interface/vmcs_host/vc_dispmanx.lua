@@ -12,7 +12,7 @@ require "vcos"
 require "vc_image_types"
 require "vc_dispservice_x_defs"
 require "vc_dispmanx_types"
---require "vchi"
+require "vchi"
 
 ffi.cdef[[
 // Same function as above, to aid migration of code.

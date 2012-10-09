@@ -197,30 +197,27 @@ vcos_countof = function(x) return (ffi.sizeof((x)) / ffi.sizeof((x)[0])) end
 #else
    #define vcos_alignof(T) (sizeof(struct { T t; char ch; }) - sizeof(T))
 #endif
+--]]
 
+ffi.cdef[[
 /** bool_t is not a POSIX type so cannot rely on it. Define it here.
   * It's not even defined in stdbool.h.
   */
 typedef int32_t vcos_bool_t;
 typedef int32_t vcos_fourcc_t;
 
-#define VCOS_FALSE   0
-#define VCOS_TRUE    (!VCOS_FALSE)
+static const int VCOS_FALSE  = 0;
+static const int VCOS_TRUE   =  !VCOS_FALSE;
+]]
 
+
+--[[
 /** Mark unused arguments to keep compilers quiet */
 #define vcos_unused(x) (void)(x)
 
 /** For backward compatibility */
 typedef vcos_fourcc_t fourcc_t;
 typedef vcos_fourcc_t FOURCC_T;
-
-#ifdef __cplusplus
-#define VCOS_EXTERN_C_BEGIN extern "C" {
-#define VCOS_EXTERN_C_END }
-#else
-#define VCOS_EXTERN_C_BEGIN
-#define VCOS_EXTERN_C_END
-#endif
 
 /** Variable attribute indicating the variable must be emitted even if it appears unused. */
 #if defined(__GNUC__) || defined(_VCOS_METAWARE)

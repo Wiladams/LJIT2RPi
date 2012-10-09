@@ -57,12 +57,21 @@ VCOS_TIMER_MARGIN_EARLY = 0;
 VCOS_TIMER_MARGIN_LATE  = 15;
 
 --BUGBUG
-VCOS_TICKS_PER_SECOND = 30
---[[
-VCOS_TICKS_PER_SECOND = function()
-	return _vcos_get_ticks_per_second();
-end
---]]
+VCOS_TICKS_PER_SECOND = 1000;
+--local lib = ffi.load("bcm_host");
+--VCOS_TICKS_PER_SECOND = lib._vcos_get_ticks_per_second();
+
+ffi.cdef[[
+typedef int sem_t;
+typedef int pthread_key_t;
+typedef int pthread_once_t;
+
+typedef sem_t                 VCOS_SEMAPHORE_T;
+typedef uint32_t              VCOS_UNSIGNED;
+typedef uint32_t              VCOS_OPTION;
+typedef pthread_key_t         VCOS_TLS_KEY_T;
+typedef pthread_once_t        VCOS_ONCE_T;
+]]
 
 --[===[
 ffi.cdef[[

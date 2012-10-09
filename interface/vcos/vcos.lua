@@ -22,7 +22,7 @@ require "vcos_assert"
 require "vcos_types"
 require "vcos_platform"
 require "vcos_init"
-require "vcos_semaphore"
+--require "vcos_semaphore"
 
 --[[
 require "vcos_thread"
