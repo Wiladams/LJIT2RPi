@@ -232,15 +232,6 @@ struct DMXDisplay {
 
 struct DMXElement {
 	DISPMANX_ELEMENT_HANDLE_T	Handle;
-	DISPMANX_DISPLAY_HANDLE_T	DisplayHandle;
-	int32_t				Layer;
-	VC_RECT_T *			DestinationRect;
-	DISPMANX_RESOURCE_HANDLE_T	ResourceHandle;
-	VC_RECT_T *			SourceRect;
-	DISPMANX_PROTECTION_T		Protection;
-	VC_DISPMANX_ALPHA_T *		Alpha;
-	DISPMANX_CLAMP_T *		Clamp;
-	DISPMANX_TRANSFORM_T		Transform;
 };
 
 struct DMXResource {
@@ -281,32 +272,47 @@ DMXDisplay_mt = {
 	end,
 
 	__index = {
-		AddElement = function(self, element)
+
+		CreateElement = function(self, DestinationRect, resource, SourceRect, layer, protection, alpha, clamp, transform)
+			if not resource then
+				return false, "no resource"
+			end
+
 			local update,err = DMXUpdate(10);
 
 			if not update then
 				return false, err
 			end
+			
+			layer = layer or 2000;
+			protection = protection or DISPMANX_PROTECTION_NONE;
+			transform = transform or ffi.C.VC_IMAGE_ROT0;
 
 			local elementHandle, err = DisplayManX.element_add(update.Handle,
 				self.Handle,
-				element.Layer,
-				element.DestinationRect,
-				element.ResourceHandle,
-				element.SourceRect,
-				element.Protection,
-				element.Alpha,
-				element.Clamp,
-				element.Transform);
+				layer,
+				DestinationRect,
+				resource.Handle,
+				SourceRect,
+				protection,
+				alpha,
+				clamp,
+				transform);
 
 			if not elementHandle then
 				return false, err
 			end
 			
-			element.Handle = elementHandle;
+			local element, err = DMXElement(elementHandle);
+			local success, err = update:SubmitSync();
 
-			return update:SubmitSync();
+			if not success then
+				return false, err
+			end
+
+			return element
 		end,
+
 
 		GetInfo = function(self)
 			return DisplayManX.get_info(self.Handle);
@@ -320,6 +326,12 @@ DMXDisplay_mt = {
 
 			DisplayManX.set_background(update.Handle, self.Handle, red, green, blue)
 			return update:SubmitSync();
+		end,
+
+		Snapshot = function(self, resource, transform)
+			transform = transform or ffi.C.VC_IMAGE_ROT0;
+
+			return DisplayManX.snapshot(self.Handle, resource, transform);
 		end,
 	},
 }
@@ -345,15 +357,9 @@ DMXElement_mt = {
 		return update:SubmitSync();
 	end,
 
-	__new = function(ct, Layer, DestinationRect, ResourceHandle, SourceRect, Protection, Alpha, Clamp, Transform)
-		local ElementHandle = DISPMANX_NO_HANDLE;
-		local DisplayHandle = DISPMANX_NO_HANDLE;
-		Layer = Layer or 2000;
-		Protection = Protection or DISPMANX_PROTECTION_NONE;
-		Transform = Transform or ffi.C.VC_IMAGE_ROT0;
-
+	__new = function(ct, handle)
 		-- Create the data structure
-		local obj = ffi.new("struct DMXElement", ElementHandle, DisplayHandle, Layer, DestinationRect, ResourceHandle, SourceRect, Protection, Alpha, Clamp, Transform);
+		local obj = ffi.new("struct DMXElement", handle);
 		
 		return obj;
 	end,
@@ -372,7 +378,7 @@ DMXResource_mt = {
 		DisplayManX.resource_delete(self.Handle);
 	end,
 
-	__new = function(ct, imgtype, width, height)
+	__new = function(ct, width, height, imgtype)
 		local handle, imgptr = DisplayManX.resource_create(imgtype, width, height);
 		if not handle then
 			return nil, imgptr
@@ -383,7 +389,7 @@ DMXResource_mt = {
 	end,
 
 	__index = {
-		WriteData = function(self, imgtype, pitch, image, dst_rect)
+		CopyImage = function(self, imgtype, pitch, image, dst_rect)
 			return DisplayManX.resource_write_data(self.Handle, imgtype, pitch, image, dst_rect);
 		end,
 	},
