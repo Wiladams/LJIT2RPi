@@ -6,65 +6,67 @@ local host = require "BcmHost"
 local Native = host.Lib
 
 -- Initialize module
-Native.vc_dispman_init();
+--Native.vc_dispman_init();
+
 -- Call this instead of vc_dispman_init
 --Native.vc_vchi_dispmanx_init (VCHI_INSTANCE_T initialise_instance, VCHI_CONNECTION_T **connections, uint32_t num_connections );
 
 DisplayManX = {
 	rect_set = function(rect, x_offset, y_offset, width, height )
 		local result = Native.vc_dispmanx_rect_set( rect, x_offset, y_offset, width, height );
-		if result == 0 then 
-			return true
-		end
-	
-		return false, result
+		return result == 0 or false, result;
 	end,
 	
-	resource_create = function(imgtype, width, height, native_image_handle)
-		local nativehandle = ffi.new("int32_t[1]", nativeimage_handle);
-		local handle = Native.vc_dispmanx_resource_create( imagetype, width, height, nativehandle );
+	-- Miscellany
+	-- Take a snapshot of a display in its current state.
+	-- This call may block for a time; when it completes, the snapshot is ready.
+	snapshot = function(display, snapshot_resource, transform)
+		local result = Native.vc_dispmanx_snapshot( display, snapshot_resource, transform );
+		return result == 0 or false, result
+	end,
+
+	-- Query the image formats supported in the VMCS build
+	query_image_formats = function()
+		local supported_formats = ffi.new("uint32_t[256]");
+		local result = Native.vc_dispmanx_query_image_formats( supported_formats );
+		return result, psupported
+	end,
+
+	resource_create = function(imgtype, width, height)
+		local phandle = ffi.new("uint32_t[1]");
+		local resource = Native.vc_dispmanx_resource_create( imgtype, width, height, phandle );
 		
-		return handle
+		if resource >0  then
+			return resource, phandle[0]
+		end
+
+		return false, resource
 	end,
 
 	-- Write the bitmap data to VideoCore memory
 	resource_write_data = function(res, src_type, src_pitch, src_address, rect)
 		local result = Native.vc_dispmanx_resource_write_data(res, src_type, src_pitch, src_address, rect );
 	
-		if result == 0 then
-			return true
-		end
-		
-		return false, result
+		return result == 0 or false, result;
 	end,
 	
 	resource_write_data_handle = function(res, src_type, src_pitch,handle, offset, rect )
 		local result = Native.vc_dispmanx_resource_write_data_handle( res, src_type, src_pitch, handle, offset, rect );
 	
-		if result == 0 then
-			return true
-		end
-		
-		return false, result;
+		return result == 0 or false, result;
 	end,
 	
 	resource_read_data = function(handle, p_rect,dst_address,dst_pitch)
 		local result = Native.vc_dispmanx_resource_read_data(handle, p_rect,dst_address,dst_pitch );
-		if result == 0 then 
-			return true
-		end
 		
-		return false, result;
+		return result == 0 or false, result;
 	end,
 	
 	-- Delete a resource
 	resource_delete = function(res)
 		local result = Native.vc_dispmanx_resource_delete( res );
-		if result == 0 then
-			return true;
-		end
 		
-		return false, result;
+		return result == 0 or false, result;
 	end,
 
 	-- Displays
@@ -85,9 +87,116 @@ DisplayManX = {
 		local handle = Native.vc_dispmanx_display_open_offscreen( dest, orientation );
 		return handle;
 	end,
+
+
+	-- Change the mode of a display
+	reconfigure = function(display, mode)	
+		local result = Native.vc_dispmanx_display_reconfigure( display, mode );
+		return result == 0 or false, result
+	end,
+
+	-- Sets the desstination of the display to be the given resource
+	set_destination = function(display, dest)
+		local result = Native.vc_dispmanx_display_set_destination( display, dest );
+		return result == 0 or false, result
+	end,
+
+	-- Set the background colour of the display
+	set_background = function(update, display, red, green, blue)
+		local result = Native.vc_dispmanx_display_set_background( update, display, red, green, blue );
+		return result == 0 or false, result
+	end,
+
+	-- get the width, height, frame rate and aspect ratio of the display
+	get_info = function(display)
+		pinfo = ffi.new("DISPMANX_MODEINFO_T");
+		local result = Native.vc_dispmanx_display_get_info( display, pinfo );
+		if result ~= 0 then
+			return false, result
+		end
+
+		return pinfo
+	end,
+
+	-- Closes a display
+	display_close = function(display)
+		local result = Native.vc_dispmanx_display_close( display );
+		return result == 0 or false, result
+	end,
+
+	-- Updates
+	-- Start a new update, DISPMANX_NO_HANDLE on error
+	update_start = function(priority)	
+		local result = Native.vc_dispmanx_update_start( priority );
+		if result == DISPMANX_NO_HANDLE then
+			return false, result
+		end
+		return result
+	end,
+
+	-- Ends an update
+	update_submit = function(update, cb_func, cb_arg)
+		local result = Native.vc_dispmanx_update_submit( update, cb_func, cb_arg );
+		return result ==0 or false, result
+	end,
+
+	-- End an update and wait for it to complete
+	update_submit_sync = function(update)
+		local result = Native.vc_dispmanx_update_submit_sync(update);
+		return result == 0 or false, result
+	end,
+
 	
+	-- Element Management
+	-- Add an element to a display as part of an update
+	element_add = function(update, display,layer, dest_rect, src, src_rect, protection, alpha, clamp, transform)
+
+		local handle = Native.vc_dispmanx_element_add ( update, display, layer, dest_rect, src,src_rect, protection, alpha, clamp, transform );
+
+		return handle
+	end,
+
+	-- Change the source image of a display element
+	element_change_source = function(update, element, src)
+		local result = Native.vc_dispmanx_element_change_source( update, element,src );
+		return result == 0 or false, result
+	end,
+
+	-- Change the layer number of a display element
+	element_change_layer = function(update, element, layer)
+		local result = Native.vc_dispmanx_element_change_layer ( update, element, layer );
+		return result == 0 or false, result
+	end,
+
+	-- Signal that a region of the bitmap has been modified
+	element_modified = function(update, element, rect)
+		local result = Native.vc_dispmanx_element_modified( update, element, rect );
+		return result == 0 or false, result
+	end,
+
+	-- Remove a display element from its display
+	element_remove = function(update, element)
+		local result = Native.vc_dispmanx_element_remove(update, element);
+		return result == 0 or false, result
+	end,
+
+	-- New function added to VCHI to change attributes, set_opacity does not work there.
+	element_change_attributes = function(update,element,change_flags,layer,opacity,dest_rect,src_rect,mask,transform)
+		local result = Native.vc_dispmanx_element_change_attributes( update, 
+                                                            element,
+                                                            change_flags,
+                                                            layer,
+                                                            opacity,
+                                                            dest_rect,
+                                                            src_rect,
+                                                            mask,
+                                                            transform );
+		return result == 0 or false, result
+	end,
 }
 
+
+return DisplayManX
 
 --[=[
 ffi.cdef[[
@@ -96,74 +205,9 @@ ffi.cdef[[
 void vc_dispmanx_stop( void );
 
 
-
-
-
-// Change the mode of a display
-int vc_dispmanx_display_reconfigure( DISPMANX_DISPLAY_HANDLE_T display, uint32_t mode );
-
-// Sets the desstination of the display to be the given resource
-int vc_dispmanx_display_set_destination( DISPMANX_DISPLAY_HANDLE_T display, DISPMANX_RESOURCE_HANDLE_T dest );
-
-// Set the background colour of the display
-int vc_dispmanx_display_set_background( DISPMANX_UPDATE_HANDLE_T update, DISPMANX_DISPLAY_HANDLE_T display,
-                                                                       uint8_t red, uint8_t green, uint8_t blue );
-// get the width, height, frame rate and aspect ratio of the display
-int vc_dispmanx_display_get_info( DISPMANX_DISPLAY_HANDLE_T display, DISPMANX_MODEINFO_T * pinfo );
-
-// Closes a display
-int vc_dispmanx_display_close( DISPMANX_DISPLAY_HANDLE_T display );
-
-// Updates
-// Start a new update, DISPMANX_NO_HANDLE on error
-DISPMANX_UPDATE_HANDLE_T vc_dispmanx_update_start( int32_t priority );
-
-// Add an elment to a display as part of an update
-DISPMANX_ELEMENT_HANDLE_T vc_dispmanx_element_add ( DISPMANX_UPDATE_HANDLE_T update, DISPMANX_DISPLAY_HANDLE_T display,
-                                                                     int32_t layer, const VC_RECT_T *dest_rect, DISPMANX_RESOURCE_HANDLE_T src,
-                                                                     const VC_RECT_T *src_rect, DISPMANX_PROTECTION_T protection, 
-                                                                     VC_DISPMANX_ALPHA_T *alpha,
-                                                                     DISPMANX_CLAMP_T *clamp, DISPMANX_TRANSFORM_T transform );
-// Change the source image of a display element
-int vc_dispmanx_element_change_source( DISPMANX_UPDATE_HANDLE_T update, DISPMANX_ELEMENT_HANDLE_T element,
-                                                        DISPMANX_RESOURCE_HANDLE_T src );
-// Change the layer number of a display element
-int vc_dispmanx_element_change_layer ( DISPMANX_UPDATE_HANDLE_T update, DISPMANX_ELEMENT_HANDLE_T element,
-                                                        int32_t layer );
-// Signal that a region of the bitmap has been modified
-int vc_dispmanx_element_modified( DISPMANX_UPDATE_HANDLE_T update, DISPMANX_ELEMENT_HANDLE_T element, const VC_RECT_T * rect );
-
-// Remove a display element from its display
-int vc_dispmanx_element_remove( DISPMANX_UPDATE_HANDLE_T update, DISPMANX_ELEMENT_HANDLE_T element );
-
-// Ends an update
-int vc_dispmanx_update_submit( DISPMANX_UPDATE_HANDLE_T update, DISPMANX_CALLBACK_FUNC_T cb_func, void *cb_arg );
-
-// End an update and wait for it to complete
-int vc_dispmanx_update_submit_sync( DISPMANX_UPDATE_HANDLE_T update );
-
-// Query the image formats supported in the VMCS build
-int vc_dispmanx_query_image_formats( uint32_t *supported_formats );
-
-//New function added to VCHI to change attributes, set_opacity does not work there.
-int vc_dispmanx_element_change_attributes( DISPMANX_UPDATE_HANDLE_T update, 
-                                                            DISPMANX_ELEMENT_HANDLE_T element,
-                                                            uint32_t change_flags,
-                                                            int32_t layer,
-                                                            uint8_t opacity,
-                                                            const VC_RECT_T *dest_rect,
-                                                            const VC_RECT_T *src_rect,
-                                                            DISPMANX_RESOURCE_HANDLE_T mask,
-                                                            VC_IMAGE_TRANSFORM_T transform );
-
 //xxx hack to get the image pointer from a resource handle, will be obsolete real soon
 uint32_t vc_dispmanx_resource_get_image_handle( DISPMANX_RESOURCE_HANDLE_T res);
 
 
-// Take a snapshot of a display in its current state.
-// This call may block for a time; when it completes, the snapshot is ready.
-int vc_dispmanx_snapshot( DISPMANX_DISPLAY_HANDLE_T display, 
-                                           DISPMANX_RESOURCE_HANDLE_T snapshot_resource, 
-                                           VC_IMAGE_TRANSFORM_T transform );
 ]]
 --]=]

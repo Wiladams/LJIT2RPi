@@ -4,7 +4,7 @@ local ffi = require "ffi"
 require "bcm_host"
 
 
---local lib = ffi.load("bcm_host");
+local lib = ffi.load("bcm_host");
 
 --[[
 	The bcm_host_init() function must be called
@@ -14,7 +14,8 @@ require "bcm_host"
 		require "bcm_host"
 --]]
 
---lib.bcm_host_init();
+lib.bcm_host_init();
+
 
 local GetDisplaySize = function(display_number)
 	display_number = display_number or 0

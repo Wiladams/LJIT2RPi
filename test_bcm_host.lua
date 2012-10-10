@@ -3,7 +3,7 @@
 local ffi = require "ffi"
 
 
-local bcm = require "bcm_host"
+local bcm = require "BcmHost"
 
 
 print(bcm.GetDisplaySize());
