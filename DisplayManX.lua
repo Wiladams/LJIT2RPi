@@ -11,6 +11,21 @@ local Native = host.Lib
 -- Call this instead of vc_dispman_init
 --Native.vc_vchi_dispmanx_init (VCHI_INSTANCE_T initialise_instance, VCHI_CONNECTION_T **connections, uint32_t num_connections );
 
+
+--[=[
+ffi.cdef[[
+
+// Stop the service from being used
+void vc_dispmanx_stop( void );
+
+
+//xxx hack to get the image pointer from a resource handle, will be obsolete real soon
+uint32_t vc_dispmanx_resource_get_image_handle( DISPMANX_RESOURCE_HANDLE_T res);
+
+
+]]
+--]=]
+
 DisplayManX = {
 	rect_set = function(rect, x_offset, y_offset, width, height )
 		local result = Native.vc_dispmanx_rect_set( rect, x_offset, y_offset, width, height );
@@ -76,8 +91,12 @@ DisplayManX = {
 	-- Displays
 	-- Opens a display on the given device
 	display_open = function(device)
-		device = device or 0
+		device = device or DISPMANX_ID_MAIN_LCD
 		local handle =  Native.vc_dispmanx_display_open( device );
+		if handle == DISPMANX_NO_HANDLE then
+			return false
+		end
+
 		return handle;
 	end,
 
@@ -201,18 +220,112 @@ DisplayManX = {
 }
 
 
+-- Class for updates
+ffi.cdef[[
+struct DMXUpdate {
+	DISPMANX_UPDATE_HANDLE_T	Handle;
+};
+
+struct DMXDisplay {
+	DISPMANX_DISPLAY_HANDLE_T	Handle;
+};
+
+struct DMXElement {
+	DISPMANX_ELEMENT_HANDLE_T	Handle;
+};
+
+struct DMXResource {
+	DISPMANX_RESOURCE_HANDLE_T	Handle;
+	uint32_t			ImagePtr;
+};		
+]]
+
+DMXDisplay = ffi.typeof("struct DMXDisplay");
+DMXDisplay_mt = {
+	__gc = function(self)
+		print("GC: DMXDisplay");
+		DisplayManX.display_close(self.Handle);
+	end,
+
+	__new = function(ct, screen)
+		local handle, err = DisplayManX.display_open(screen);
+		if not handle then
+			return false, err
+		end
+
+		local obj = ffi.new(ct, handle)
+		return obj;
+	end,
+
+	__index = {
+		GetInfo = function(self)
+			return DisplayManX.get_info(self.Handle);
+		end,
+	},
+}
+ffi.metatype(DMXDisplay, DMXDisplay_mt);
+
+
+DMXResource = ffi.typeof("struct DMXResource");
+DMXResource_mt = {
+	__gc = function(self)
+		print("GC: DMXResource");
+		DisplayManX.resource_delete(self.Handle);
+	end,
+
+	__new = function(ct, imgtype, width, height)
+		local handle, imgptr = DisplayManX.resource_create(imgtype, width, height);
+		if not handle then
+			return nil, imgptr
+		end
+
+		local obj = ffi.new(ct, handle, imgptr);
+		return obj;
+	end,
+
+	__index = {
+		WriteData = function(self, imgtype, pitch, image, dst_rect)
+			return DisplayManX.resource_write_data(self.Handle, imgtype, pitch, image, dst_rect);
+		end,
+	},
+}
+ffi.metatype(DMXResource, DMXResource_mt);
+
+
+DMXUpdate = ffi.typeof("struct DMXUpdate");
+DMXUpdate_mt = {
+	__gc = function(self)
+
+	end,
+
+	__new = function(ct, priority)
+		priority = priority or 10
+		local handle, err = DisplayManX.update_start(priority);
+		if not handle then 
+			return nil, err
+		end
+
+		local obj = ffi.new(ct, handle);
+		return obj;
+	end,
+
+	__index = {
+		Submit = function(self, cb_func, cb_arg)
+			return DisplayManX.update_submit(self.Handle, cb_func, cb_arg); 
+		end,
+
+		SubmitSync = function(self)
+			return DisplayManX.update_submit_sync(self.Handle);
+		end,
+
+	},
+}
+ffi.metatype(DMXUpdate, DMXUpdate_mt);
+
+
+
+DisplayManX.DMXUpdate = DMXUpdate;
+
 return DisplayManX
 
---[=[
-ffi.cdef[[
 
-// Stop the service from being used
-void vc_dispmanx_stop( void );
-
-
-//xxx hack to get the image pointer from a resource handle, will be obsolete real soon
-uint32_t vc_dispmanx_resource_get_image_handle( DISPMANX_RESOURCE_HANDLE_T res);
-
-
-]]
---]=]

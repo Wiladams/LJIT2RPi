@@ -1,8 +1,6 @@
 
 
 -- A simple demo using dispmanx to display an overlay
-package.path = package.path..";../../?.lua;"
-
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -12,40 +10,15 @@ local bor = bit.bor
 local rshift = bit.rshift
 local lshift = bit.lshift
 
-local bcm = require "BcmHost"
 local DMX = require "DisplayManX"
 
-
-WIDTH   = 400
-HEIGHT  = 400
 
 ALIGN_UP = function(x,y)  
     return band((x + y-1), bnot(y-1))
 end
 
-ffi.cdef[[
-typedef struct
-{
-    DISPMANX_DISPLAY_HANDLE_T   display;
-    DISPMANX_MODEINFO_T         info;
-    void                       *image;
-    DISPMANX_UPDATE_HANDLE_T    update;
-    DISPMANX_RESOURCE_HANDLE_T  resource;
-    DISPMANX_ELEMENT_HANDLE_T   element;
-    uint32_t                    vc_image_ptr;
 
-} RECT_VARS_T;
-]]
-
-local RECT_VARS_T = ffi.typeof("RECT_VARS_T");
-local VC_RECT_T = ffi.typeof("VC_RECT_T");
-local VC_DISPMANX_ALPHA_T = ffi.typeof("VC_DISPMANX_ALPHA_T");
-
-
-local gRectVars = RECT_VARS_T();
-
-function FillRect( imgtype, image, pitch, aligned_height,  x,  y,  w,  h, val)
-
+function FillRect( image, imgtype, pitch, aligned_height,  x,  y,  w,  h, val)
     local         row;
     local         col;
     local srcPtr = ffi.cast("int16_t *", image);
@@ -63,78 +36,70 @@ function FillRect( imgtype, image, pitch, aligned_height,  x,  y,  w,  h, val)
     end
 end
 
-function main()
+function Run(width, height)
+    width = width or 200
+    height = height or 200
 
-    local vars = gRectVars;
-    local screen = 0;
-    local src_rect = VC_RECT_T();
-    local dst_rect = VC_RECT_T();
     local imgtype =ffi.C.VC_IMAGE_RGB565;
-    local width = WIDTH; 
-    local height = HEIGHT;
     local pitch = ALIGN_UP(width*2, 32);
     local aligned_height = ALIGN_UP(height, 16);
     
     local alpha = VC_DISPMANX_ALPHA_T( bor(ffi.C.DISPMANX_FLAGS_ALPHA_FROM_SOURCE, ffi.C.DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS), 120, 0 );
 
-    vars = gRectVars;
-
+    local vars = {}
     
+    local screen = 0;
     print(string.format("Open display[%i]...", screen) );
-    vars.display = DMX.display_open( screen );
+    vars.display = DMXDisplay( screen );
 
 
-    vars.info = DMX.get_info(vars.display);
-    assert(vars.info);
+    vars.info = vars.display:GetInfo();
     
     print(string.format("Display is %d x %d", vars.info.width, vars.info.height) );
 
     vars.image = ffi.C.calloc( 1, pitch * height );
-    assert(vars.image);
 
-    FillRect( imgtype, vars.image, pitch, aligned_height,  0,  0, width,      height,      0xFFFF );
-    FillRect( imgtype, vars.image, pitch, aligned_height,  0,  0, width,      height,      0xF800 );
-    FillRect( imgtype, vars.image, pitch, aligned_height, 20, 20, width - 40, height - 40, 0x07E0 );
-    FillRect( imgtype, vars.image, pitch, aligned_height, 40, 40, width - 80, height - 80, 0x001F );
+    FillRect( vars.image, imgtype,  pitch, aligned_height,  0,  0, width,      height,      0xFFFF );
+    FillRect( vars.image, imgtype,  pitch, aligned_height,  0,  0, width,      height,      0xF800 );
+    FillRect( vars.image, imgtype,  pitch, aligned_height, 20, 20, width - 40, height - 40, 0x07E0 );
+    FillRect( vars.image, imgtype,  pitch, aligned_height, 40, 40, width - 80, height - 80, 0x001F );
 
-    vars.resource, vars.vc_image_ptr = DMX.resource_create(imgtype, width, height);
-    assert( vars.resource > 0);
+    vars.resource = DMXResource(imgtype, width, height);
 
 	
-    DMX.rect_set( dst_rect, 0, 0, width, height);
+    local dst_rect = VC_RECT_T(0, 0, width, height);
 
-    assert(DMX.resource_write_data(  vars.resource, imgtype, pitch, vars.image, dst_rect ));
+    vars.resource:WriteData(imgtype, pitch, vars.image, dst_rect);
 	
-    vars.update = DMX.update_start( 10 );
-    assert( vars.update );
 
-    DMX.rect_set( src_rect, 0, 0, lshift(width, 16), lshift(height, 16) );
-    DMX.rect_set( dst_rect, ( vars.info.width - width ) / 2, ( vars.info.height - height ) / 2, width, height );
+    local src_rect = VC_RECT_T( 0, 0, lshift(width, 16), lshift(height, 16) );
+    dst_rect = VC_RECT_T( (vars.info.width - width ) / 2, ( vars.info.height - height ) / 2, width, height );
 
-    vars.element = DMX.element_add(    vars.update,
-                                                vars.display,
-                                                2000,               -- layer
-                                                dst_rect,
-                                                vars.resource,
-                                                src_rect,
-                                                DISPMANX_PROTECTION_NONE,
-                                                alpha,
-                                                nil,             -- clamp
-                                                ffi.C.VC_IMAGE_ROT0 );
+    vars.update = DMXUpdate( 10 );
+ 
+    vars.element = DMX.element_add(vars.update.Handle,
+				   vars.display.Handle,
+				   2000,               -- layer
+                                   dst_rect,
+                                   vars.resource.Handle,
+                                   src_rect,
+                                   DISPMANX_PROTECTION_NONE,
+                                   alpha,
+                                   nil,             -- clamp
+                                   ffi.C.VC_IMAGE_ROT0 );
 
-    assert(DMX.update_submit_sync( vars.update ));
+    vars.update:SubmitSync();
 
-    print( "Sleeping for 10 seconds..." );
-    ffi.C.sleep( 10 );
+    local seconds = 1
+    print( string.format("Sleeping for %d seconds...", seconds ));
+    ffi.C.sleep( seconds );
 
-    vars.update = DMX.update_start( 10 );
-    assert(vars.update);
-    
-    assert(DMX.element_remove(vars.update, vars.element));
-    assert(DMX.update_submit_sync(vars.update));
-    assert(DMX.resource_delete(vars.resource));	
-    assert(DMX.display_close(vars.display));
+    vars.update = DMXUpdate(10);
+     
+    assert(DMX.element_remove(vars.update.Handle, vars.element));
+    vars.update:SubmitSync();
 
 end
 
-main();
+
+Run(400, 200);

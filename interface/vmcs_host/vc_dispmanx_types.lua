@@ -19,6 +19,11 @@ typedef uint32_t DISPMANX_RESOURCE_HANDLE_T;
 typedef uint32_t DISPMANX_PROTECTION_T;
 ]]
 
+DISPMANX_DISPLAY_HANDLE_T = ffi.typeof("DISPMANX_DISPLAY_HANDLE_T");
+DISPMANX_UPDATE_HANDLE_T = ffi.typeof("DISPMANX_UPDATE_HANDLE_T");
+DISPMANX_ELEMENT_HANDLE_T = ffi.typeof("DISPMANX_ELEMENT_HANDLE_T");
+DISPMANX_RESOURCE_HANDLE_T = ffi.typeof("DISPMANX_RESOURCE_HANDLE_T");
+
 DISPMANX_NO_HANDLE =0
 
 DISPMANX_PROTECTION_MAX   =0x0f
@@ -29,7 +34,7 @@ DISPMANX_PROTECTION_HDCP  =11   -- Derived from the WM DRM levels, 101-300
 
 --[[
  Default display IDs.
-   Note: if you overwrite with you own dispmanx_platfrom_init function, you
+   Note: if you overwrite with your own dispmanx_platfrom_init function, you
    should use IDs you provided during dispmanx_display_attach.
 --]]
 
@@ -80,6 +85,10 @@ typedef struct {
   DISPMANX_RESOURCE_HANDLE_T mask;
 } VC_DISPMANX_ALPHA_T;  /* for use with vmcs_host */
 ]]
+
+DISPMANX_ALPHA_T = ffi.typeof("DISPMANX_ALPHA_T");
+VC_DISPMANX_ALPHA_T = ffi.typeof("VC_DISPMANX_ALPHA_T");
+
 
 ffi.cdef[[
 typedef enum {

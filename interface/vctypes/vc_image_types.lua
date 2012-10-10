@@ -140,3 +140,4 @@ typedef enum
 
 ]]
 
+VC_RECT_T = ffi.typeof("VC_RECT_T");
