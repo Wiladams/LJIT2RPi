@@ -232,6 +232,15 @@ struct DMXDisplay {
 
 struct DMXElement {
 	DISPMANX_ELEMENT_HANDLE_T	Handle;
+	DISPMANX_DISPLAY_HANDLE_T	DisplayHandle;
+	int32_t				Layer;
+	VC_RECT_T *			DestinationRect;
+	DISPMANX_RESOURCE_HANDLE_T	ResourceHandle;
+	VC_RECT_T *			SourceRect;
+	DISPMANX_PROTECTION_T		Protection;
+	VC_DISPMANX_ALPHA_T *		Alpha;
+	DISPMANX_CLAMP_T *		Clamp;
+	DISPMANX_TRANSFORM_T		Transform;
 };
 
 struct DMXResource {
@@ -240,6 +249,20 @@ struct DMXResource {
 };		
 ]]
 
+
+--[[
+	The Display is the hook into the graphics
+	system.  There may be a couple of displays
+	connected to the device (composite, HDMI).
+
+	There are a very few functions that operate
+	on the display directly, such as setting the 
+	background, and getting information.
+
+	Perhaps the most important function is 
+	AddElement, as this is how you get to display
+	some graphics.
+--]]
 DMXDisplay = ffi.typeof("struct DMXDisplay");
 DMXDisplay_mt = {
 	__gc = function(self)
@@ -258,12 +281,88 @@ DMXDisplay_mt = {
 	end,
 
 	__index = {
+		AddElement = function(self, element)
+			local update,err = DMXUpdate(10);
+
+			if not update then
+				return false, err
+			end
+
+			local elementHandle, err = DisplayManX.element_add(update.Handle,
+				self.Handle,
+				element.Layer,
+				element.DestinationRect,
+				element.ResourceHandle,
+				element.SourceRect,
+				element.Protection,
+				element.Alpha,
+				element.Clamp,
+				element.Transform);
+
+			if not elementHandle then
+				return false, err
+			end
+			
+			element.Handle = elementHandle;
+
+			return update:SubmitSync();
+		end,
+
 		GetInfo = function(self)
 			return DisplayManX.get_info(self.Handle);
+		end,
+
+		SetBackground = function(self, red, green, blue)
+			local update, err = DMXUpdate(10);
+			if not update then
+				return nil, err
+			end
+
+			DisplayManX.set_background(update.Handle, self.Handle, red, green, blue)
+			return update:SubmitSync();
 		end,
 	},
 }
 ffi.metatype(DMXDisplay, DMXDisplay_mt);
+
+
+--[[
+	The essential display element.
+	Elements are regions of the display where drawing
+	occurs.  They might be thought of as the building
+	blocks for a "Window".
+--]]
+DMXElement = ffi.typeof("struct DMXElement");
+DMXElement_mt = {
+	__gc = function(self)
+		print("GC: DMXElement");
+		if self.Handle == DISPMANX_NO_HANDLE then
+			return true
+		end
+
+		local update = DMXUpdate(10);
+		DisplayManX.element_remove(updata.Handle, self.Handle);
+		return update:SubmitSync();
+	end,
+
+	__new = function(ct, Layer, DestinationRect, ResourceHandle, SourceRect, Protection, Alpha, Clamp, Transform)
+		local ElementHandle = DISPMANX_NO_HANDLE;
+		local DisplayHandle = DISPMANX_NO_HANDLE;
+		Layer = Layer or 2000;
+		Protection = Protection or DISPMANX_PROTECTION_NONE;
+		Transform = Transform or ffi.C.VC_IMAGE_ROT0;
+
+		-- Create the data structure
+		local obj = ffi.new("struct DMXElement", ElementHandle, DisplayHandle, Layer, DestinationRect, ResourceHandle, SourceRect, Protection, Alpha, Clamp, Transform);
+		
+		return obj;
+	end,
+
+	__index = {
+	},
+}
+ffi.metatype(DMXElement, DMXElement_mt);
+
 
 
 DMXResource = ffi.typeof("struct DMXResource");
@@ -325,6 +424,9 @@ ffi.metatype(DMXUpdate, DMXUpdate_mt);
 
 
 DisplayManX.DMXUpdate = DMXUpdate;
+DisplayManX.DMXDisplay = DMXDisplay;
+DisplayManX.DMXResource = DMXResource;
+DisplayManX.DMXElement = DMXElement;
 
 return DisplayManX
 

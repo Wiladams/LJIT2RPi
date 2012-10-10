@@ -47,16 +47,16 @@ function Run(width, height)
     local alpha = VC_DISPMANX_ALPHA_T( bor(ffi.C.DISPMANX_FLAGS_ALPHA_FROM_SOURCE, ffi.C.DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS), 120, 0 );
 
     local vars = {}
-    
-    local screen = 0;
-    print(string.format("Open display[%i]...", screen) );
-    vars.display = DMXDisplay( screen );
+ 
+    -- Get a connection to the display
+    local Display = DMXDisplay();
+    Display:SetBackground(5, 15, 35);
 
-
-    vars.info = vars.display:GetInfo();
+    vars.info = Display:GetInfo();
     
     print(string.format("Display is %d x %d", vars.info.width, vars.info.height) );
 
+    -- Createa a bitmap image to be displayed
     vars.image = ffi.C.calloc( 1, pitch * height );
 
     FillRect( vars.image, imgtype,  pitch, aligned_height,  0,  0, width,      height,      0xFFFF );
@@ -75,29 +75,17 @@ function Run(width, height)
     local src_rect = VC_RECT_T( 0, 0, lshift(width, 16), lshift(height, 16) );
     dst_rect = VC_RECT_T( (vars.info.width - width ) / 2, ( vars.info.height - height ) / 2, width, height );
 
-    vars.update = DMXUpdate( 10 );
  
-    vars.element = DMX.element_add(vars.update.Handle,
-				   vars.display.Handle,
-				   2000,               -- layer
-                                   dst_rect,
-                                   vars.resource.Handle,
-                                   src_rect,
-                                   DISPMANX_PROTECTION_NONE,
-                                   alpha,
-                                   nil,             -- clamp
-                                   ffi.C.VC_IMAGE_ROT0 );
+    -- Create the element that will actually 
+    -- display the resource
+    Element = DMXElement(2000,dst_rect,vars.resource.Handle,src_rect,DISPMANX_PROTECTION_NONE,alpha);
+    Display:AddElement(Element);
 
-    vars.update:SubmitSync();
 
+    -- Sleep for a second so we can see the results
     local seconds = 1
     print( string.format("Sleeping for %d seconds...", seconds ));
     ffi.C.sleep( seconds );
-
-    vars.update = DMXUpdate(10);
-     
-    assert(DMX.element_remove(vars.update.Handle, vars.element));
-    vars.update:SubmitSync();
 
 end
 
