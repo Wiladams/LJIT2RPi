@@ -27,9 +27,13 @@ DisplayManX = {
 
 	-- Query the image formats supported in the VMCS build
 	query_image_formats = function()
-		local supported_formats = ffi.new("uint32_t[256]");
-		local result = Native.vc_dispmanx_query_image_formats( supported_formats );
-		return result, psupported
+		local pformats = ffi.new("uint32_t [256]");
+		local result = Native.vc_dispmanx_query_image_formats( pformats );
+		if result == 0 then
+			return pformats
+		end
+
+		return false, result
 	end,
 
 	resource_create = function(imgtype, width, height)
@@ -72,6 +76,7 @@ DisplayManX = {
 	-- Displays
 	-- Opens a display on the given device
 	display_open = function(device)
+		device = device or 0
 		local handle =  Native.vc_dispmanx_display_open( device );
 		return handle;
 	end,

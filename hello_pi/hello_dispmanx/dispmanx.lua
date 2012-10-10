@@ -25,13 +25,9 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --]]
 
-// A simple demo using dispmanx to display an overlay
+-- A simple demo using dispmanx to display an overlay
+package.path = package.path..";../../?.lua;"
 
-#include <stdlib.h>
-#include <stdarg.h>
-#include <assert.h>
-#include <unistd.h>
-#include <sys/time.h>
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -39,7 +35,7 @@ local bnot = bit.bnot
 local band = bit.band
 local rshift = bit.rshift
 
-local bcm = require "bcm_host"
+local bcm = require "BcmHost"
 local Native = bcm.Lib;
 
 WIDTH   = 200
@@ -70,23 +66,22 @@ local VC_DISPMANX_ALPHA_T = ffi.typeof("VC_DISPMANX_ALPHA_T");
 
 local gRectVars = RECT_VARS_T();
 
-function FillRect( VC_IMAGE_TYPE_T type, void *image, int pitch, int aligned_height, int x, int y, int w, int h, int val )
+function FillRect( imgtype, image, pitch, aligned_height,  x,  y,  w,  h, val)
 
     local         row;
     local         col;
 
     local line = ffi.cast("uint16_t *",image + y * rshift(pitch,1) + x);
 
-	row = 0;
+    row = 0;
     while ( row < h ) do
-		col = 0; 
+	col = 0; 
         while ( col < w) do
-        
             line[col] = val;
-			col = col + 1;
+	    col = col + 1;
         end
         line = line + rshift(pitch,1);
-		row = row + 1;
+	row = row + 1;
     end
 end
 
@@ -96,20 +91,21 @@ function main()
     local screen = 0;
     local src_rect = VC_RECT_T();
     local dst_rect = VC_RECT_T();
-    local VC_IMAGE_TYPE_T imgtype = VC_IMAGE_RGB565;
-    local width = WIDTH, height = HEIGHT;
+    local imgtype =ffi.C.VC_IMAGE_RGB565;
+    local width = WIDTH; 
+    local height = HEIGHT;
     local pitch = ALIGN_UP(width*2, 32);
     local aligned_height = ALIGN_UP(height, 16);
     
-	local alpha = VC_DISPMANX_ALPHA_T( bor(DISPMANX_FLAGS_ALPHA_FROM_SOURCE, DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS), 120, 0 );
+    local alpha = VC_DISPMANX_ALPHA_T( bor(DISPMANX_FLAGS_ALPHA_FROM_SOURCE, DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS), 120, 0 );
 
     vars = gRectVars;
 
-    --bcm_host_init();
-
+    
     print(string.format("Open display[%i]...", screen) );
     vars.display = Native.vc_dispmanx_display_open( screen );
 
+--[[
 	local ret;
     ret = Native.vc_dispmanx_display_get_info( vars.display, vars.info);
     assert(ret == 0);
@@ -171,7 +167,7 @@ function main()
 	
     ret = Native.vc_dispmanx_display_close( vars.display );
     assert( ret == 0 );
-
+--]]
     return 0;
 end
 

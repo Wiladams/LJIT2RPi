@@ -13,7 +13,6 @@ local rshift = bit.rshift
 local lshift = bit.lshift
 
 local bcm = require "BcmHost"
---local Native = bcm.Lib;
 local DMX = require "DisplayManX"
 
 
