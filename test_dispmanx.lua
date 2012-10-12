@@ -45,7 +45,7 @@ function Run(width, height)
 
     -- Get a connection to the display
     local Display = DMXDisplay();
-    Display:SetBackground(5, 15, 65);
+    Display:SetBackground(5, 65, 65);
 
     local info = Display:GetInfo();
     
@@ -81,7 +81,7 @@ function Run(width, height)
  
 
     -- Sleep for a second so we can see the results
-    local seconds = 1
+    local seconds = 5
     print( string.format("Sleeping for %d seconds...", seconds ));
     ffi.C.sleep( seconds )
 

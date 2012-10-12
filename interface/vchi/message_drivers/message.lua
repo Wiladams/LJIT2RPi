@@ -1,4 +1,3 @@
-package.path = package.path .. ";../?.lua;../../vcos/?.lua;"
 local ffi = require "ffi"
 
 -- MPHI videocore message driver

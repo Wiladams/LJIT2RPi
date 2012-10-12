@@ -1,5 +1,4 @@
 
-package.path = package.path..";./pthreads/?.lua;"
 --[[
 =============================================================================
 VideoCore OS Abstraction Layer - public header file

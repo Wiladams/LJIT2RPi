@@ -1,4 +1,3 @@
-package.path = package.path..";../vctypes/?.lua"
 
 local ffi = require "ffi"
 
