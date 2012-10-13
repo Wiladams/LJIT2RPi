@@ -17,6 +17,9 @@ local lib = ffi.load("bcm_host");
 lib.bcm_host_init();
 
 
+
+
+
 local GetDisplaySize = function(display_number)
 	display_number = display_number or 0
 	local pWidth = ffi.new("uint32_t[1]");

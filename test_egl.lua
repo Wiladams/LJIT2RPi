@@ -1,29 +1,33 @@
-package.path = package.path..";..\\?.lua;..\\Win32\\?.lua";
 
 local ffi = require "ffi"
 local bit = require "bit"
 local bor = bit.bor
+local lshift = bit.lshift;
 
-local NativeWindow = require "User32Window"
-local EGL = require "egl_utils"
+local DMX = require "DisplayManX"
 
-local OpenVG = require "OpenVG"
-local OpenVGUtils = require "OpenVG_Utils"
-local ogm = require "OglMan"
+
+local rpiui = require "rpiui"
+
+local GLES = rpiui.GLES;
+local EGL = rpiui.EGL;
+local OpenVG = rpiui.OpenVG;
+
 local RenderClass = require"Drawing"
 
 
+-- Create the EGL Display Object
+local RealDisplay = EGL.Display.new();
+assert(RealDisplay, "EglDisplay not created");
 
 
-local dpy = EglDisplay.new(nil, EGL.EGL_OPENVG_API);
-assert(dpy, "EglDisplay not created");
 
 local screenWidth = 640;
 local screenHeight = 480;
 
 
-
-local Renderer = RenderClass.new(dpy, screenWidth, screenHeight);
+-- Create the renderer so we can do some drawing
+local Renderer = RenderClass.new(RealDisplay, screenWidth, screenHeight);
 
 
 
@@ -34,9 +38,23 @@ local drawLines = function()
 
 end
 
-local drawRectangles = function()
-	Renderer:Fill(230, 23, 23, 1);
-	Renderer:Rect(10,10,100,100);
+local drawRectangles = function(count)
+    count = count or 100;
+
+    for i=1,count do
+        local width = math.random(10,250);
+        local height = math.random(10,250);
+	local x = math.random(0,screenWidth -1-width);
+	local y = math.random(0,screenHeight - 1-height);
+	  
+	local red = math.random(0,255);
+	local green = math.random(0,255);
+	local blue = math.random(0,255);
+
+	Renderer:Fill(red, green, blue, 1);
+	--print(x,y,width, height, ": ", red, green, blue);
+	Renderer:Rect(x,y,width,height);
+    end
 end
 
 local drawEllipses = function()
@@ -58,46 +76,56 @@ local tick = function(ticker, tickCount)
 	Renderer:Background(0, 0, 0);				   -- Black background
 
 	drawEllipses();
-	drawRectangles();
+	drawRectangles(255);
 	drawLines();
 
 	Renderer:End();
 end
 
 
+function createNativeWindow(width, height)
 
--- Create a window
-local winParams = {
-	ClassName = "EGLWindow",
-	Title = "EGL Window",
-	Origin = {10,10},
-	Extent = {screenWidth, screenHeight},
-	FrameRate = 3,
+	-- get the DMX display first
+	local Display = DMX.DMXDisplay();
+	assert(Display, "Could not initialize DMXDisplay");
 
-	OnTickDelegate = tick;
-};
+   	local dst_rect = VC_RECT_T(0,0,width, height);   
+   	local src_rect = VC_RECT_T(0,0, lshift(width, 16), lshift(height,16));      
 
+   	local View = Display:CreateElement(dst_rect, nil, src_rect);     
 
--- create an EGL window surface
-local win = NativeWindow.new(winParams)
-assert(win, "Window not created");
+	-- create an EGL window surface
+  	local nativewindow = ffi.new("EGL_DISPMANX_WINDOW_T");
+  	nativewindow.element = View.Handle;
+   	nativewindow.width = width;
+   	nativewindow.height = height;
 
-local surf = dpy:CreateWindowSurface(win:GetHandle())
+	return nativewindow;
+end
+
+local nativewindow = createNativeWindow(screenWidth, screenHeight);
+local surf = RealDisplay:CreateWindowSurface(nativewindow)
 
 -- Make the context current
-dpy:MakeCurrent();
+RealDisplay:MakeCurrent();
+
 
 glViewport(0,0,screenWidth,screenHeight);
 glMatrixMode(GL_PROJECTION);
 glLoadIdentity();
 
 local ratio = screenWidth/screenHeight;
-glFrustum(-ratio, ratio, -1, 1, 1, 10);
+glFrustumf(-ratio, ratio, -1, 1, 1, 10);
 
 
 -- Now, finally do some drawing
-win:Run();
+tick(RealDisplay, 1);
 
+
+    -- Sleep for a second so we can see the results
+    local seconds = 5
+    print( string.format("Sleeping for %d seconds...", seconds ));
+    ffi.C.sleep( seconds )
 
 -- free up the display
-dpy:free();
+RealDisplay:free();

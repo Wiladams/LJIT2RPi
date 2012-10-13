@@ -1,4 +1,4 @@
-package.path = package.path..";interface/vctypes/?.lua;interface/vchi/?.lua;interface/vcos/?.lua;interface/vcos/pthreads/?.lua;interface/vmcs_host/?.lua"
+package.path = package.path..";interface/vctypes/?.lua;interface/vchi/?.lua;interface/vcos/?.lua;interface/vmcs_host/?.lua"
 
 local ffi = require "ffi"
 

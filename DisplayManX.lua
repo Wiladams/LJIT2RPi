@@ -274,9 +274,6 @@ DMXDisplay_mt = {
 	__index = {
 
 		CreateElement = function(self, DestinationRect, resource, SourceRect, layer, protection, alpha, clamp, transform)
-			if not resource then
-				return false, "no resource"
-			end
 
 			local update,err = DMXUpdate(10);
 
@@ -284,15 +281,21 @@ DMXDisplay_mt = {
 				return false, err
 			end
 			
-			layer = layer or 2000;
+			layer = layer or 0;
 			protection = protection or DISPMANX_PROTECTION_NONE;
 			transform = transform or ffi.C.VC_IMAGE_ROT0;
+			local resourcehandle
+			if resource then 
+				resourcehandle = resource.Handle
+			else
+				resourcehandle = 0
+			end
 
 			local elementHandle, err = DisplayManX.element_add(update.Handle,
 				self.Handle,
 				layer,
 				DestinationRect,
-				resource.Handle,
+				resourcehandle,
 				SourceRect,
 				protection,
 				alpha,
@@ -316,6 +319,11 @@ DMXDisplay_mt = {
 
 		GetInfo = function(self)
 			return DisplayManX.get_info(self.Handle);
+		end,
+
+		GetSize = function(self)
+			local info = self:GetInfo();
+			return info.width, info.height;
 		end,
 
 		SetBackground = function(self, red, green, blue)
@@ -353,8 +361,10 @@ DMXElement_mt = {
 		end
 
 		local update = DMXUpdate(10);
-		DisplayManX.element_remove(updata.Handle, self.Handle);
-		return update:SubmitSync();
+		if update then
+			DisplayManX.element_remove(update.Handle, self.Handle);
+			return update:SubmitSync();
+		end
 	end,
 
 	__new = function(ct, handle)

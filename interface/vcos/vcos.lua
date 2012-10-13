@@ -5,6 +5,7 @@ VideoCore OS Abstraction Layer - public header file
 =============================================================================*/
 --]]
 
+local ffi = require "ffi"
 
 --[[
    \file vcos.h
@@ -54,4 +55,10 @@ require "../vcos/vcos_cmd.h"
 --]]
 
 
+local vcos_Lib = ffi.load("vcos");
+vcos_Lib.vcos_init();
+
+return {
+	Lib = vcos_Lib;
+}
 
