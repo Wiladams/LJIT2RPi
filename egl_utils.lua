@@ -16,7 +16,6 @@ EglDisplay_mt = {
 }
 
 EglDisplay.new = function(api, dispid)
-	api = api or EGL.EGL_OPENVG_API
 	local dpy
 	
 	if not dispid then
@@ -32,9 +31,13 @@ EglDisplay.new = function(api, dispid)
 	setmetatable(obj, EglDisplay_mt);
 	
 	obj:Initialize();
-	obj:BindToAPI(api);
-	obj:ChooseConfig();
-	obj:CreateContext();
+	
+	if api then
+		-- api = api or EGL.EGL_OPENVG_API
+		assert(obj:BindToAPI(api), "Could not bind to API");
+	end
+	assert(obj:ChooseConfig(), "Could not choose config");
+	assert(obj:CreateContext(), "Could not create context");
 	
 	return obj
 end
@@ -46,7 +49,7 @@ end
 EglDisplay.Initialize = function(self)
 	local pmajor = ffi.new("EGLint[1]");
 	local pminor = ffi.new("EGLint[1]");
-	local res = EGL.Lib.eglInitialize(self.Handle, pmajor, pminor);
+	local res = EGL.Lib.eglInitialize(self.Handle, nil, nil);
 	assert(res ~= EGL.EGL_FALSE);
 	
 	return self, pmajor[0], pminor[0];
@@ -70,17 +73,22 @@ EglDisplay.ChooseConfig = function(self, attribute_list)
 		EGL.EGL_GREEN_SIZE, 8,		
 		EGL.EGL_BLUE_SIZE, 8,		
 		EGL.EGL_ALPHA_SIZE, 8,		
-		EGL.EGL_SURFACE_TYPE, EGL.EGL_WINDOW_BIT,		
+		EGL.EGL_SURFACE_TYPE, EGL.EGL_WINDOW_BIT,	
 		EGL.EGL_NONE);
 	
-	local pconfig = ffi.new("EGLConfig[1]");
+	local pconfig = ffi.new("EGLConfig[10]");
 	local pnum_config = ffi.new("EGLint[1]");
 
-	local res = EGL.Lib.eglChooseConfig(self.Handle, attribute_list, pconfig, 1, pnum_config);
-	
+	local res = EGL.Lib.eglChooseConfig(self.Handle, attribute_list, pconfig, 10, pnum_config);
+
 	assert(res == EGL.EGL_TRUE);
 
+	local num_config = pnum_config[0]
+	print("EglDisplay.ChooseConfig(): num: ", num_config);
+
 	self.Config = pconfig[0];
+
+	return self.Config;
 end
 
 EglDisplay.CreateContext = function(self, config)
@@ -111,8 +119,10 @@ EglDisplay.MakeCurrent = function(self, surface, context)
 end
 
 EglDisplay.SwapBuffers = function(self, surface)
-	surface = surface or self.Surface;
-	local res = EGL.Lib.eglSwapBuffers(self.Handle, surface);
+    surface = surface or self.Surface;
+    local res = EGL.Lib.eglSwapBuffers(self.Handle, surface);
+    
+    return res;
 end
 
 

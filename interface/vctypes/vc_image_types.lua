@@ -7,7 +7,6 @@ local ffi = require "ffi"
 	This file gets included by the VCE compiler, which gets confused
 	easily by the VCOS headers. So cannot include vcos.h here.
 --]]
---require "../vcos/vcos_stdint"
 
 ffi.cdef[[
 /* We have so many rectangle types; let's try to introduce a common one. */

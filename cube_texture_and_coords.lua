@@ -3,7 +3,7 @@ local ffi = require "ffi"
 
 -- Spatial coordinates for the cube
 
-quadx = ffi.new("char[?]", 6*4*3, {
+quadx = ffi.new("GLbyte[?]", 6*4*3, {
    -- FRONT 
    -10, -10,  10,
    10, -10,  10,
@@ -42,7 +42,7 @@ quadx = ffi.new("char[?]", 6*4*3, {
 });
 
 -- Texture coordinates for the quad. 
-texCoords = ffi.new("float[?]", 6 * 4 * 2, {
+texCoords = ffi.new("GLfloat[?]", 6 * 4 * 2, {
    0,  0,
    0,  1,
    1,  0,

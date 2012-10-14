@@ -1,12 +1,7 @@
-package.path = package.path..";khronos/?.lua"
-
 
 local ffi = require "ffi"
 
 local BCMHost = require "BcmHost"
-
-require "khrplatform"
-
 
 
 --[[
@@ -18,7 +13,7 @@ require "khrplatform"
 	to be loaded first.
 --]]
 local GLESv1 = require "GLESMan"
-local GLESv2 = require "GLES2Man";
+--local GLESv2 = require "GLES2Man";
 
 local EGL = require "egl_utils";
 
@@ -36,7 +31,7 @@ return {
 	BCMHost = BCMHost;
 
 	GLES = GLESv1;
-	GLES2 = GLESv2;
+--	GLES2 = GLESv2;
 
 	EGL = EGL;
 	OpenVG = OpenVG;

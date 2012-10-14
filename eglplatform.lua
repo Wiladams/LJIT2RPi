@@ -1,8 +1,10 @@
 
 
---#include "../KHR/khrplatform.h"
 
 local ffi = require "ffi"
+
+require "khrplatform"
+
 
 ffi.cdef[[
 typedef void *EGLNativeDisplayType;

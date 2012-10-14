@@ -7,22 +7,29 @@ local bit = require "bit"
 local lshift = bit.lshift
 local rshift = bit.rshift
 
+local DMX = require "DisplayManX"
+
 local rpiui = require "rpiui"
+
 local GLES = rpiui.GLES
 local EGL = rpiui.EGL
+local OpenVG = rpiui.OpenVG;
 
-local DMX = require "DisplayManX"
 
 
 require "cube_texture_and_coords";
 
 
-local egldisplay = EGL.Display.new(EGL.EGL_OPENGL_ES_API);
---local egldisplay = EGL.Display.new();
+--local egldisplay = EGL.Display.new(EGL.EGL_OPENGL_ES_API);
+local egldisplay = EGL.Display.new();
 assert(egldisplay, "EglDisplay not created");
 
 local dmxdisplay = DMX.DMXDisplay();
 assert(dmxdisplay, "Could not initialize DMXDisplay");
+
+
+local screenWidth = 640;
+local screenHeight = 480;
 
 
 local IMAGE_SIZE = 128;
@@ -46,6 +53,8 @@ function createNativeWindow(dmxdisplay, width, height)
     local dst_rect = VC_RECT_T(0,0,width, height);   
     local src_rect = VC_RECT_T(0,0, lshift(width, 16), lshift(height,16));      
 
+    --local alpha = VC_DISPMANX_ALPHA_T(ffi.C.DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS,255,0);
+    --local dmxview = dmxdisplay:CreateElement(dst_rect, nil, src_rect, 0, DISPMANX_PROTECTION_NONE, alpha);     
     local dmxview = dmxdisplay:CreateElement(dst_rect, nil, src_rect);     
     assert(dmxview, "FAILURE: Did not create dmxview");
 
@@ -63,13 +72,16 @@ function init_ogl(state)
 
     -- Get size of the display window
     state.screen_width, state.screen_height = dmxdisplay:GetSize();
+    state.screen_width = screenWidth;
+    state.screen_height = screenHeight;
     print("SCREEN SIZE: ", state.screen_width, state.screen_height);
 
     -- Setup the EGL Display
     state.display = egldisplay;
+    
     state.nativewindow = createNativeWindow(dmxdisplay, state.screen_width, state.screen_height); 
     state.surface = egldisplay:CreateWindowSurface(state.nativewindow);
-    print("SURFACE: ", state.surface, err);
+    print("SURFACE: ", state.surface);
 
     -- connect the context to the surface
     state.display:MakeCurrent();
@@ -210,7 +222,7 @@ function reset_model(state)
    state.rot_angle_x = 45; 
    state.rot_angle_y = 30; 
    state.rot_angle_z = 0;
-   state.rot_angle_x_inc = 0.5; 
+   state.rot_angle_x_inc = 0; 
    state.rot_angle_y_inc = 0.5; 
    state.rot_angle_z_inc = 0;
    
@@ -230,12 +242,11 @@ end
 *
 **********************************************************
 --]]
+
 function init_model_proj(state)
 
    local nearp = 1.0;
    local farp = 500.0;
-   local hht;
-   local hwd;
 
    glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
 
@@ -244,8 +255,8 @@ function init_model_proj(state)
    glMatrixMode(GL_PROJECTION);
    glLoadIdentity();
 
-   hht = nearp * math.tan(45.0 / 2.0 / 180.0 * math.pi);
-   hwd = hht * state.screen_width / state.screen_height;
+   local hht = nearp * math.tan(45.0 / 2.0 / 180.0 * math.pi);
+   local hwd = hht * state.screen_width / state.screen_height;
 
    glFrustumf(-hwd, hwd, -hht, hht, nearp, farp);
    
@@ -393,9 +404,11 @@ function redraw_scene(state)
    glRotatef(90, 0, 0, 1 ); -- back face normal along z axis
    glDrawArrays( GL_TRIANGLE_STRIP, 4, 4);
 
+
    glBindTexture(GL_TEXTURE_2D, state.tex[2]);
    glRotatef(90, 1, 0, 0 ); -- left face normal along x axis
    glDrawArrays( GL_TRIANGLE_STRIP, 8, 4);
+
 
    glBindTexture(GL_TEXTURE_2D, state.tex[3]);
    glRotatef(90, 1, 0, 0 ); -- right face normal along x axis
@@ -412,6 +425,7 @@ function redraw_scene(state)
    glDrawArrays( GL_TRIANGLE_STRIP, 20, 4);
 
    glDisable(GL_TEXTURE_2D);
+
 
    state.display:SwapBuffers();
 end
@@ -440,7 +454,17 @@ function main()
 
    -- Clear application state
    local state = {
-	distance_inc = 0,
+	-- model rotation vector and direction
+   	rot_angle_x_inc = 0;
+   	rot_angle_y_inc = 0;
+   	rot_angle_z_inc = 0;
+	-- current model rotation angles
+   	rot_angle_x = 0;
+   	rot_angle_y = 0;
+   	rot_angle_z = 0;
+	-- current distance from camera
+   	distance = 0;
+   	distance_inc = 0;
    }
       
    -- Start OGLES
@@ -454,7 +478,7 @@ function main()
 
    while not terminate do
    
-      --usleep(5*1000);
+      ffi.C.sleep(1);
       update_model(state);
       redraw_scene(state);
    end
