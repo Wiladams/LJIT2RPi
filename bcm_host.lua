@@ -1,4 +1,4 @@
-package.path = package.path..";interface/vctypes/?.lua;interface/vchi/?.lua;interface/vcos/?.lua;interface/vmcs_host/?.lua"
+package.path = package.path..";interface/?.lua;interface/vchi/?.lua;interface/vcos/?.lua"
 
 local ffi = require "ffi"
 
@@ -10,11 +10,11 @@ int32_t graphics_get_display_size( const uint16_t display_number, uint32_t *widt
 ]]
 
 require "libc"
-require "vc_dispmanx"
+require "interface/vc_dispmanx"
+require "interface/vc_tvservice"
 
 --[[
 
-require "interface/vmcs_host/vc_tvservice"
 require "interface/vmcs_host/vc_cec"
 require "interface/vmcs_host/vc_cecservice"
 require "interface/vmcs_host/vcgencmd"

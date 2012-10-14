@@ -431,14 +431,15 @@ typedef enum {
  */
 --]]
 
--- Some constants which are required on host side
-HDCP_KEY_BLOCK_SIZE		= 328; -- KSV, padding, device keys and hash.
-HDCP_KSV_LENGTH			= 5;
-HDCP_MAX_DEVICE			= 127; -- Max. number of HDCP downstream device supported
-HDCP_MAX_DEPTH 			= 7; -- Max. number of levels HDCP 1.x can have
-EDID_BLOCKSIZE 			= 128;
-HDMI_NUM_PACKET_BYTES	= 28; -- Size of HDMI infoframes minus the header
-
+ffi.cdef[[
+// Some constants which are required on host side
+static const int HDCP_KEY_BLOCK_SIZE	= 328;	// KSV, padding, device keys and hash.
+static const int HDCP_KSV_LENGTH	= 5;
+static const int HDCP_MAX_DEVICE	= 127;	// Max. number of HDCP downstream device supported
+static const int HDCP_MAX_DEPTH 	= 7;	// Max. number of levels HDCP 1.x can have
+static const int EDID_BLOCKSIZE 	= 128;
+static const int HDMI_NUM_PACKET_BYTES	= 28;	// Size of HDMI infoframes minus the header
+]]
 -- All CEC related constants now reside in vc_cec.h
 
 ffi.cdef[[
@@ -476,32 +477,8 @@ typedef VC_HDMI_ERROR_T HDMI_RESULT_T;
 HDMI_RESULT_SUCCESS = ffi.C.VC_HDMI_SUCCESS;
 HDMI_RESULT_FAILED  = ffi.C.VC_HDMI_ERROR_FORMAT_UNSUPPORTED;
 
+HDMI_DISPLAY_OPTIONS_T = ffi.typeof("HDMI_DISPLAY_OPTIONS_T");
 
---[[
-/*
-Copyright (c) 2012, Broadcom Europe Ltd
-All rights reserved.
+HDMI_SPD_DATA_T = ffi.typeof("HDMI_SPD_DATA_T");
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of the copyright holder nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
---]]

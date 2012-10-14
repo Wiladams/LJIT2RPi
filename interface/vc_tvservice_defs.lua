@@ -8,7 +8,7 @@ local ffi = require "ffi"
 --]]
 
 require "common"
-#include "../vchi/message_drivers/message.h"
+require "message"
 require "vc_hdmi"
 
 TVSERVICE_MSGFIFO_SIZE = 1024
@@ -200,8 +200,8 @@ typedef struct {
 //TV_SET_SPD
 //Parameters: name [8], description [16], type
 //Reply: none
-static const int TV_SPD_NAME_LEN 8;
-static const int TV_SPD_DESC_LEN 16;
+static const int TV_SPD_NAME_LEN = 8;
+static const int TV_SPD_DESC_LEN = 16;
 
 typedef struct {
    char manufacturer[TV_SPD_NAME_LEN];

@@ -11,7 +11,7 @@ local ffi = require "ffi"
 
 require "vchi_cfg_internal"
 require "vchi_common"
-require "message_drivers/message"
+require "message"
 
 ffi.cdef[[
 /******************************************************************************

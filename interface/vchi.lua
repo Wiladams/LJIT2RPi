@@ -12,7 +12,7 @@ local rshift = bit.rshift
 require "vcos"
 require "vchi_cfg"
 require "vchi_common"
-require "connections/connection"
+require "connection"
 require "vchi_mh"
 
 
@@ -99,6 +99,10 @@ typedef struct vchi_msg_vector_ex {
 
 -- Macros to manipulate fourcc_t values
 MAKE_FOURCC = function(x) 
+	if type(x) == "string" then
+		return (bor( lshift(string.byte(x,1), 24), lshift(string.byte(x,2), 16), lshift(string.byte(x,3), 8), string.byte(x,4) ))
+	end
+
 	return (bor( lshift(x[0], 24), lshift(x[1], 16), lshift(x[2], 8), x[3] ))
 end
 
