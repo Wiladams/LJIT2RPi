@@ -1,13 +1,13 @@
 
 
--- A rotating cube rendered with OpenGL|ES. Three images used as textures on the cube faces.
+-- A rotating cube rendered with OpenGL|ES. 
+-- Three images used as textures on the cube faces.
 
 local ffi = require "ffi"
 local bit = require "bit"
 local lshift = bit.lshift
 local rshift = bit.rshift
 
-local DMX = require "DisplayManX"
 
 local rpiui = require "rpiui"
 
@@ -17,22 +17,19 @@ local OpenVG = rpiui.OpenVG;
 
 
 
-require "cube_texture_and_coords";
 
 
---local egldisplay = EGL.Display.new(EGL.EGL_OPENGL_ES_API);
-local egldisplay = EGL.Display.new();
-assert(egldisplay, "EglDisplay not created");
-
-local dmxdisplay = DMX.DMXDisplay();
-assert(dmxdisplay, "Could not initialize DMXDisplay");
-
-
-local screenWidth = 640;
-local screenHeight = 480;
+local windowWidth = 640;
+local windowHeight = 480;
 
 
 local IMAGE_SIZE = 128;
+
+require "cube_texture_and_coords";
+
+-- Setup window
+local mainWindow = EGL.Window.new(windowWidth, windowHeight);
+
 
 --[[
 /***********************************************************
@@ -48,44 +45,8 @@ local IMAGE_SIZE = 128;
  ***********************************************************/
 --]]
 
-function createNativeWindow(dmxdisplay, width, height)
 
-    local dst_rect = VC_RECT_T(0,0,width, height);   
-    local src_rect = VC_RECT_T(0,0, lshift(width, 16), lshift(height,16));      
-
-    --local alpha = VC_DISPMANX_ALPHA_T(ffi.C.DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS,255,0);
-    --local dmxview = dmxdisplay:CreateElement(dst_rect, nil, src_rect, 0, DISPMANX_PROTECTION_NONE, alpha);     
-    local dmxview = dmxdisplay:CreateElement(dst_rect, nil, src_rect);     
-    assert(dmxview, "FAILURE: Did not create dmxview");
-
-    -- create an EGL window surface
-    local nativewindow = ffi.new("EGL_DISPMANX_WINDOW_T");
-    nativewindow.element = dmxview.Handle;
-    nativewindow.width = width;
-    nativewindow.height = height;
-
-    return nativewindow;
-end
-
-
-function init_ogl(state)
-
-    -- Get size of the display window
-    state.screen_width, state.screen_height = dmxdisplay:GetSize();
-    state.screen_width = screenWidth;
-    state.screen_height = screenHeight;
-    print("SCREEN SIZE: ", state.screen_width, state.screen_height);
-
-    -- Setup the EGL Display
-    state.display = egldisplay;
-    
-    state.nativewindow = createNativeWindow(dmxdisplay, state.screen_width, state.screen_height); 
-    state.surface = egldisplay:CreateWindowSurface(state.nativewindow);
-    print("SURFACE: ", state.surface);
-
-    -- connect the context to the surface
-    state.display:MakeCurrent();
-
+function init_ogl(state, width, height)
     -- Set background color and clear buffers
     glClearColor(0.15, 0.25, 0.35, 1.0);
     glClear( GL_COLOR_BUFFER_BIT );
@@ -426,8 +387,7 @@ function redraw_scene(state)
 
    glDisable(GL_TEXTURE_2D);
 
-
-   state.display:SwapBuffers();
+   mainWindow:SwapBuffers();
 end
 
 
@@ -436,13 +396,13 @@ function exit_func()
 
    -- clear screen
    glClear( GL_COLOR_BUFFER_BIT );
-   state.display:SwapBuffers();
+   mainWindow:SwapBuffers();
  
    -- Release OpenGL resources
-   eglMakeCurrent( state.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT );
-   eglDestroySurface( state.display, state.surface );
+   --eglMakeCurrent( state.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT );
+   --eglDestroySurface( state.display, state.surface );
    --eglDestroyContext( state.display, state.context );
-   eglTerminate( state.display );
+   --eglTerminate( state.display );
 
 
    print("\ncube closed");
@@ -467,8 +427,13 @@ function main()
    	distance_inc = 0;
    }
       
+   -- Get size of the display window
+   state.screen_width = windowWidth;
+   state.screen_height = windowHeight;
+   --print("SCREEN SIZE: ", state.screen_width, state.screen_height);
+
    -- Start OGLES
-   init_ogl(state);
+   init_ogl(state, windowWidth, windowHeight);
 
    -- Setup the model world
    init_model_proj(state);
