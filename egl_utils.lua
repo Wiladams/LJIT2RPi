@@ -33,6 +33,7 @@ EglDisplay.new = function(api, dispid)
 	
 	obj:Initialize();
 	
+	--print("BINDING TO API: ", api);
 	if api then
 		-- api = api or EGL.EGL_OPENVG_API
 		assert(obj:BindToAPI(api), "Could not bind to API");
@@ -172,7 +173,7 @@ local EGLWindow_mt = {
 	__index = EGLWindow,
 }
 
-EGLWindow.new = function(width, height, config)
+EGLWindow.new = function(width, height, config, api)
 
 	config = config or {background = {153, 153, 153}};
 
@@ -182,7 +183,7 @@ EGLWindow.new = function(width, height, config)
 	}
 
 	-- Create the display object
-	obj.Display = EglDisplay.new();
+	obj.Display = EglDisplay.new(api);
 
 	-- create nativewindow
 	local dmxdisplay = DMX.DMXDisplay();
@@ -219,9 +220,15 @@ EGLWindow.SwapBuffers = function(self)
 	self.Display:SwapBuffers();
 end
 
+EGL.Display = EglDisplay
+EGL.Window = EGLWindow;
+
+return EGL
+
+--[[
 return {
 	Lib = EGL.Lib,
 	Display = EglDisplay,
 	Window = EGLWindow,
 	}
-
+--]]
