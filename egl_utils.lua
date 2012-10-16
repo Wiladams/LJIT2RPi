@@ -11,19 +11,6 @@ local vgu = require "vgu"
 EGL.Lib = ffi.load("EGL");
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 local EglDisplay = {}
 local EglDisplay_mt = {
 	__index = EglDisplay,
@@ -187,6 +174,8 @@ local EGLWindow_mt = {
 
 EGLWindow.new = function(width, height, config)
 
+	config = config or {background = {153, 153, 153}};
+
 	local obj = {
 		Width = width;
 		Height = height;
@@ -230,15 +219,9 @@ EGLWindow.SwapBuffers = function(self)
 	self.Display:SwapBuffers();
 end
 
-
-
-
-
-
-
 return {
 	Lib = EGL.Lib,
 	Display = EglDisplay,
 	Window = EGLWindow,
 	}
-	
+
