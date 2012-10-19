@@ -48,6 +48,30 @@ EglDisplay.free = function(self)
 	local res = EGL.Lib.eglTerminate(self.Handle);	
 end
 
+--[[
+	Various Attributes
+--]]
+EglDisplay.ClientAPIs = function(self)
+	return ffi.string(EGL.Lib.eglQueryString(self.Handle, EGL.EGL_CLIENT_APIS));
+end
+
+EglDisplay.CurrentAPI = function(self)
+	return EGL.Lib.eglQueryAPI();
+end
+
+EglDisplay.Vendor = function(self)
+	return ffi.string(EGL.Lib.eglQueryString(self.Handle, EGL.EGL_VENDOR));
+end
+
+
+EglDisplay.Extensions = function(self)
+	return ffi.string(EGL.Lib.eglQueryString(self.Handle, EGL.EGL_EXTENSIONS));
+end
+
+
+--[[
+	Meat and potatoes
+--]]
 EglDisplay.Initialize = function(self)
 	local pmajor = ffi.new("EGLint[1]");
 	local pminor = ffi.new("EGLint[1]");

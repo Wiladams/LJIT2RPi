@@ -20,11 +20,18 @@ local screenHeight = 480;
 print("EGL API: ", EGL.EGL_OPENVG_API);
 
 local mainWindow = EGL.Window.new(screenWidth, screenHeight, nil, EGL.EGL_OPENVG_API);
+--local mainWindow = EGL.Window.new(screenWidth, screenHeight, nil, EGL.EGL_OPENGLES_API);
+--local mainWindow = EGL.Window.new(screenWidth, screenHeight, nil);
 
 local RenderClass = require"Drawing"
 
 
-
+print("-- EGL --");
+print("Vendor: ", mainWindow.Display:Vendor());
+print("ClientAPIs: ", mainWindow.Display:ClientAPIs());
+print(string.format("Current API: 0x%x", mainWindow.Display:CurrentAPI()));
+print("Extensions: ");
+print(mainWindow.Display:Extensions());
 
 -- Create the renderer so we can do some drawing
 local Renderer = RenderClass.new(mainWindow.Display, screenWidth, screenHeight);
