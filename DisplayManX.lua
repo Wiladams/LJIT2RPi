@@ -234,6 +234,8 @@ struct DMXElement {
 	DISPMANX_ELEMENT_HANDLE_T	Handle;
 };
 
+
+
 struct DMXResource {
 	DISPMANX_RESOURCE_HANDLE_T	Handle;
 	uint32_t			ImagePtr;
@@ -402,6 +404,10 @@ DMXResource_mt = {
 		CopyImage = function(self, imgtype, pitch, image, dst_rect)
 			return DisplayManX.resource_write_data(self.Handle, imgtype, pitch, image, dst_rect);
 		end,
+
+		CopyPixelBuffer = function(self, pbuff, dst_rect)
+			return DisplayManX.resource_write_data(self.Handle, pbuff.PixelFormat, pbuff.Pitch, pbuff.Data, dst_rect);
+		end,
 	},
 }
 ffi.metatype(DMXResource, DMXResource_mt);
@@ -438,11 +444,83 @@ DMXUpdate_mt = {
 ffi.metatype(DMXUpdate, DMXUpdate_mt);
 
 
-
+-- Core data structures
 DisplayManX.DMXUpdate = DMXUpdate;
 DisplayManX.DMXDisplay = DMXDisplay;
 DisplayManX.DMXResource = DMXResource;
 DisplayManX.DMXElement = DMXElement;
+
+
+
+
+
+--[[
+	The contrived classes
+--]]
+
+ffi.cdef[[
+struct DMXPixelData {
+	void *		Data;
+	VC_IMAGE_TYPE_T	PixelFormat;
+	int32_t		Width;
+	int32_t		Height;
+	int32_t		Pitch;
+};
+]]
+
+local DMXPixelData = ffi.typeof("struct DMXPixelData");
+local DMXPixelData_mt = {
+
+	__gc = function(self)
+		print("GC: DMXPixelMatrix");
+		if self.DataPtr ~= nil then
+			ffi.C.free(self.DataPtr);
+		end
+	end,
+
+	__new = function(ct, width, height, pformat)
+		pformat = pformat or ffi.C.VC_IMAGE_RGB565
+		local sizeofpixel = 2;
+
+		local pitch = ALIGN_UP(width*sizeofpixel, 32);
+		local aligned_height = ALIGN_UP(height, 16);
+		local dataPtr = ffi.C.calloc(pitch * height, 1);
+--print("DATA PTR: ", dataPtr, ffi.sizeof(dataPtr));
+		return ffi.new(ct, dataPtr, pformat, width, height, pitch);
+	end,
+}
+ffi.metatype(DMXPixelData, DMXPixelData_mt);
+
+local DMXPixelBuffer = {}
+local DMXPixelBuffer_mt = {
+	__index = DMXPixelBuffer,
+}
+
+DMXPixelBuffer.new(width, height, pformat)
+	local pdata = DMXPixelData(width, height, pformat)
+	local resource = DMXResource(width, height, pformat);
+	obj = {
+		PixelData = pdata;
+		Resource = DMXResource(width, height, pformat);
+	}
+	setmetatable(obj, DMXPixelBuffer_mt);
+
+	return obj
+end
+
+DMXPixelBuffer.CopyPixelBuffer = function(self, pbuff, x, y, width, height)
+
+end
+
+
+
+
+
+
+DisplayManX.DMXPixelData = DMXPixelData;
+--DisplayManX.DMXPixelBuffer = DMXPixelBuffer;
+--DisplayManX.DMXView = DMXView;
+
 
 return DisplayManX
 

@@ -19,21 +19,17 @@ end
 
 -- This is a very simple graphics rendering routine.
 -- It will fill in a rectangle, and that's it.
-function FillRect( image, imgtype, pitch, aligned_height,  x,  y,  w,  h, val)
-    local         row;
-    local         col;
-    local srcPtr = ffi.cast("int16_t *", image);
-    local line = ffi.cast("uint16_t *",srcPtr + y * rshift(pitch,1) + x);
+function FillRect( pbuff, x,  y,  w,  h, val)
+    local dataPtr = ffi.cast("uint8_t *", pbuff.Data);
+    --local pitch = pbuff.Pitch;
 
-    row = 0;
-    while ( row < h ) do
-	col = 0; 
-        while ( col < w) do
-            line[col] = val;
-	    col = col + 1;
+    local row;
+    local col;
+    for row=y, y+h-1  do
+    	local rowPtr = ffi.cast("int16_t *", (dataPtr + (pbuff.Pitch*row)));
+        for col=x, x+w-1 do
+            rowPtr[col] = val;
         end
-        line = line + rshift(pitch,1);
-	row = row + 1;
     end
 end
 
@@ -52,24 +48,24 @@ function Run(width, height)
     print(string.format("Display is %d x %d", info.width, info.height) );
 
     -- Create an image to be displayed
-    local imgtype =ffi.C.VC_IMAGE_RGB565;
-    local pitch = ALIGN_UP(width*2, 32);
-    local aligned_height = ALIGN_UP(height, 16);
-    local image = ffi.C.calloc( 1, pitch * height );
+    local pbuff = DMX.DMXPixelData(width, height);
 
-    FillRect( image, imgtype,  pitch, aligned_height,  0,  0, width,      height,      0xFFFF );
-    FillRect( image, imgtype,  pitch, aligned_height,  0,  0, width,      height,      0xF800 );
-    FillRect( image, imgtype,  pitch, aligned_height, 20, 20, width - 40, height - 40, 0x07E0 );
-    FillRect( image, imgtype,  pitch, aligned_height, 40, 40, width - 80, height - 80, 0x001F );
 
-    local BackingStore = DMXResource(width, height, imgtype);
+
+    --FillRect( pbuff,  0,  0, width,      height,      0xffff );
+    FillRect( pbuff,  0,  0, width,      height,      0xF800 );
+    FillRect( pbuff, 20, 20, width - 40, height - 40, 0x07E0 );
+    FillRect( pbuff, 40, 40, width - 80, height - 80, 0x001F );
+
+
+    local BackingStore = DMXResource(width, height, pbuff.PixelFormat);
 
 	
     local dst_rect = VC_RECT_T(0, 0, width, height);
 
     -- Copy the image that was created into 
     -- the backing store
-    BackingStore:CopyImage(imgtype, pitch, image, dst_rect);
+    BackingStore:CopyPixelBuffer(pbuff, dst_rect);
 
  
     -- Create the view that will actually 
@@ -81,7 +77,7 @@ function Run(width, height)
  
 
     -- Sleep for a second so we can see the results
-    local seconds = 5
+    local seconds = 2
     print( string.format("Sleeping for %d seconds...", seconds ));
     ffi.C.sleep( seconds )
 
