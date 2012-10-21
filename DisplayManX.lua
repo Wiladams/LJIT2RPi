@@ -350,7 +350,7 @@ DMXDisplay_mt = {
 		Snapshot = function(self, resource, transform)
 			transform = transform or ffi.C.VC_IMAGE_ROT0;
 
-			return DisplayManX.snapshot(self.Handle, resource, transform);
+			return DisplayManX.snapshot(self.Handle, resource.Handle, transform);
 		end,
 	},
 }
@@ -367,15 +367,7 @@ DMXElement = ffi.typeof("struct DMXElement");
 DMXElement_mt = {
 	__gc = function(self)
 		print("GC: DMXElement");
-		if self.Handle == DISPMANX_NO_HANDLE then
-			return true
-		end
-
-		local update = DMXUpdate(10);
-		if update then
-			DisplayManX.element_remove(update.Handle, self.Handle);
-			return update:SubmitSync();
-		end
+		self:Free();
 	end,
 
 	__new = function(ct, handle)
@@ -386,6 +378,19 @@ DMXElement_mt = {
 	end,
 
 	__index = {
+		Free = function(self)
+	
+			if self.Handle == DISPMANX_NO_HANDLE then
+				return true
+			end
+
+			local update = DMXUpdate(10);
+			if update then
+				DisplayManX.element_remove(update.Handle, self.Handle);
+				update:SubmitSync();
+				self.Handle = DISPMANX_NO_HANDLE;
+			end
+		end,
 	},
 }
 ffi.metatype(DMXElement, DMXElement_mt);
@@ -400,6 +405,7 @@ DMXResource_mt = {
 	end,
 
 	__new = function(ct, width, height, imgtype)
+		imgtype = imgtype or ffi.C.VC_IMAGE_RGB565;
 		local handle, imgptr = DisplayManX.resource_create(imgtype, width, height);
 		if not handle then
 			return nil, imgptr
@@ -509,18 +515,19 @@ local DMXView_mt = {
 	__index = DMXView,
 }
 
-DMXView.new = function(display, x, y, width, height, pformat, layer)
+DMXView.new = function(display, x, y, width, height, layer, pformat, resource)
 	x = x or 0
 	y = y or 0
 	layer = layer or 0
 	pformat = pformat or ffi.C.VC_IMAGE_RGB565
-	local resource = DMXResource(width, height, pformat);
+	resource = resource or DMXResource(width, height, pformat);
+
 	local obj = {
 		X = x;
 		Y = y;
 		Width = width;
 		Height = height;
-		Resource = DMXResource(width, height, pformat);
+		Resource = resource;
 		Layer = layer;
 		Display = display;
 	}
@@ -533,6 +540,16 @@ end
 
 DMXView.CopyPixelBuffer = function(self, pbuff, x, y, width, height)
 	self.Resource:CopyPixelBuffer(pbuff, x, y, width, height)
+end
+
+DMXView.Hide = function(self)
+	if (self.Surface) then
+		self.Surface:Free();
+	end
+
+	self.Surface = nil;
+	
+	return true;
 end
 
 DMXView.Show = function(self)

@@ -17,7 +17,6 @@ local DMX = require "DisplayManX"
 -- It will fill in a rectangle, and that's it.
 function FillRect( pbuff, x,  y,  w,  h, val)
     local dataPtr = ffi.cast("uint8_t *", pbuff.Data);
-    --local pitch = pbuff.Pitch;
 
     local row;
     local col;
@@ -29,12 +28,13 @@ function FillRect( pbuff, x,  y,  w,  h, val)
     end
 end
 
+-- Setup the display
 width = 400
 height = 200
 
 -- Get a connection to the display
 local Display = DMXDisplay();
-Display:SetBackground(5, 65, 65);
+Display:SetBackground(125, 65, 65);
 
 local info = Display:GetInfo();
     
