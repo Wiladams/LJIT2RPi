@@ -1,5 +1,10 @@
 
 local ffi = require "ffi"
+local bit = require "bit"
+local lshift = bit.lshift
+local rshift = bit.rshift
+local band = bit.band
+local bnot = bit.bnot
 
 -- Display manager service API
 local host = require "BcmHost"
@@ -10,6 +15,10 @@ local Native = host.Lib
 
 -- Call this instead of vc_dispman_init
 --Native.vc_vchi_dispmanx_init (VCHI_INSTANCE_T initialise_instance, VCHI_CONNECTION_T **connections, uint32_t num_connections );
+
+local ALIGN_UP = function(x,y)  
+    return band((x + y-1), bnot(y-1))
+end
 
 
 --[=[
@@ -234,6 +243,8 @@ struct DMXElement {
 	DISPMANX_ELEMENT_HANDLE_T	Handle;
 };
 
+
+
 struct DMXResource {
 	DISPMANX_RESOURCE_HANDLE_T	Handle;
 	uint32_t			ImagePtr;
@@ -274,9 +285,6 @@ DMXDisplay_mt = {
 	__index = {
 
 		CreateElement = function(self, DestinationRect, resource, SourceRect, layer, protection, alpha, clamp, transform)
-			if not resource then
-				return false, "no resource"
-			end
 
 			local update,err = DMXUpdate(10);
 
@@ -284,15 +292,21 @@ DMXDisplay_mt = {
 				return false, err
 			end
 			
-			layer = layer or 2000;
+			layer = layer or 0;
 			protection = protection or DISPMANX_PROTECTION_NONE;
 			transform = transform or ffi.C.VC_IMAGE_ROT0;
+			local resourcehandle
+			if resource then 
+				resourcehandle = resource.Handle
+			else
+				resourcehandle = 0
+			end
 
 			local elementHandle, err = DisplayManX.element_add(update.Handle,
 				self.Handle,
 				layer,
 				DestinationRect,
-				resource.Handle,
+				resourcehandle,
 				SourceRect,
 				protection,
 				alpha,
@@ -318,6 +332,11 @@ DMXDisplay_mt = {
 			return DisplayManX.get_info(self.Handle);
 		end,
 
+		GetSize = function(self)
+			local info = self:GetInfo();
+			return info.width, info.height;
+		end,
+
 		SetBackground = function(self, red, green, blue)
 			local update, err = DMXUpdate(10);
 			if not update then
@@ -331,7 +350,7 @@ DMXDisplay_mt = {
 		Snapshot = function(self, resource, transform)
 			transform = transform or ffi.C.VC_IMAGE_ROT0;
 
-			return DisplayManX.snapshot(self.Handle, resource, transform);
+			return DisplayManX.snapshot(self.Handle, resource.Handle, transform);
 		end,
 	},
 }
@@ -348,13 +367,7 @@ DMXElement = ffi.typeof("struct DMXElement");
 DMXElement_mt = {
 	__gc = function(self)
 		print("GC: DMXElement");
-		if self.Handle == DISPMANX_NO_HANDLE then
-			return true
-		end
-
-		local update = DMXUpdate(10);
-		DisplayManX.element_remove(updata.Handle, self.Handle);
-		return update:SubmitSync();
+		self:Free();
 	end,
 
 	__new = function(ct, handle)
@@ -365,6 +378,19 @@ DMXElement_mt = {
 	end,
 
 	__index = {
+		Free = function(self)
+	
+			if self.Handle == DISPMANX_NO_HANDLE then
+				return true
+			end
+
+			local update = DMXUpdate(10);
+			if update then
+				DisplayManX.element_remove(update.Handle, self.Handle);
+				update:SubmitSync();
+				self.Handle = DISPMANX_NO_HANDLE;
+			end
+		end,
 	},
 }
 ffi.metatype(DMXElement, DMXElement_mt);
@@ -379,6 +405,7 @@ DMXResource_mt = {
 	end,
 
 	__new = function(ct, width, height, imgtype)
+		imgtype = imgtype or ffi.C.VC_IMAGE_RGB565;
 		local handle, imgptr = DisplayManX.resource_create(imgtype, width, height);
 		if not handle then
 			return nil, imgptr
@@ -391,6 +418,11 @@ DMXResource_mt = {
 	__index = {
 		CopyImage = function(self, imgtype, pitch, image, dst_rect)
 			return DisplayManX.resource_write_data(self.Handle, imgtype, pitch, image, dst_rect);
+		end,
+
+		CopyPixelBuffer = function(self, pbuff, x, y, width, height)
+			local dst_rect = VC_RECT_T(x, y, width, height);
+			return DisplayManX.resource_write_data(self.Handle, pbuff.PixelFormat, pbuff.Pitch, pbuff.Data, dst_rect);
 		end,
 	},
 }
@@ -428,11 +460,114 @@ DMXUpdate_mt = {
 ffi.metatype(DMXUpdate, DMXUpdate_mt);
 
 
-
+-- Core data structures
 DisplayManX.DMXUpdate = DMXUpdate;
 DisplayManX.DMXDisplay = DMXDisplay;
 DisplayManX.DMXResource = DMXResource;
 DisplayManX.DMXElement = DMXElement;
+
+
+
+
+
+--[[
+	The contrived classes
+--]]
+
+ffi.cdef[[
+struct DMXPixelData {
+	void *		Data;
+	VC_IMAGE_TYPE_T	PixelFormat;
+	int32_t		Width;
+	int32_t		Height;
+	int32_t		Pitch;
+};
+]]
+
+local DMXPixelData = ffi.typeof("struct DMXPixelData");
+local DMXPixelData_mt = {
+
+	__gc = function(self)
+		print("GC: DMXPixelMatrix");
+		if self.Data ~= nil then
+			ffi.C.free(self.Data);
+		end
+	end,
+
+	__new = function(ct, width, height, pformat)
+		pformat = pformat or ffi.C.VC_IMAGE_RGB565
+		local sizeofpixel = 2;
+
+		local pitch = ALIGN_UP(width*sizeofpixel, 32);
+		local aligned_height = ALIGN_UP(height, 16);
+		local dataPtr = ffi.C.calloc(pitch * height, 1);
+		return ffi.new(ct, dataPtr, pformat, width, height, pitch);
+	end,
+}
+ffi.metatype(DMXPixelData, DMXPixelData_mt);
+
+
+
+
+
+local DMXView = {}
+local DMXView_mt = {
+	__index = DMXView,
+}
+
+DMXView.new = function(display, x, y, width, height, layer, pformat, resource)
+	x = x or 0
+	y = y or 0
+	layer = layer or 0
+	pformat = pformat or ffi.C.VC_IMAGE_RGB565
+	resource = resource or DMXResource(width, height, pformat);
+
+	local obj = {
+		X = x;
+		Y = y;
+		Width = width;
+		Height = height;
+		Resource = resource;
+		Layer = layer;
+		Display = display;
+	}
+	setmetatable(obj, DMXView_mt);
+
+	obj:Show();
+
+	return obj
+end
+
+DMXView.CopyPixelBuffer = function(self, pbuff, x, y, width, height)
+	self.Resource:CopyPixelBuffer(pbuff, x, y, width, height)
+end
+
+DMXView.Hide = function(self)
+	if (self.Surface) then
+		self.Surface:Free();
+	end
+
+	self.Surface = nil;
+	
+	return true;
+end
+
+DMXView.Show = function(self)
+   local dst_rect = VC_RECT_T(self.X, self.Y, self.Width, self.Height);
+   local src_rect = VC_RECT_T( 0, 0, lshift(self.Width, 16), lshift(self.Height, 16) );
+   self.Surface = self.Display:CreateElement(dst_rect, self.Resource, src_rect, self.Layer, DISPMANX_PROTECTION_NONE, alpha);
+end
+
+
+
+
+
+
+
+DisplayManX.DMXPixelData = DMXPixelData;
+--DisplayManX.DMXPixelBuffer = DMXPixelBuffer;
+DisplayManX.DMXView = DMXView;
+
 
 return DisplayManX
 

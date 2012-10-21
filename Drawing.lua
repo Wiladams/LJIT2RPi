@@ -167,7 +167,12 @@ end
 
 -- setfill sets the fill color
 function Renderer:SetFill(color)
-	local fillPaint = OpenVGUtils.Paint();
+	local fillPaint, err = OpenVGUtils.Paint();
+	if not fillPaint then
+		print("SetFill Failed: ", err);
+		return false;
+	end
+
 	fillPaint:SetType(ffi.C.VG_PAINT_TYPE_COLOR);
 	fillPaint:SetColor(color);
 	fillPaint:SetModes(ffi.C.VG_FILL_PATH);

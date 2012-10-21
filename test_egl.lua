@@ -1,51 +1,82 @@
-package.path = package.path..";..\\?.lua;..\\Win32\\?.lua";
 
 local ffi = require "ffi"
 local bit = require "bit"
 local bor = bit.bor
-
-local NativeWindow = require "User32Window"
-local EGL = require "egl_utils"
-
-local OpenVG = require "OpenVG"
-local OpenVGUtils = require "OpenVG_Utils"
-local ogm = require "OglMan"
-local RenderClass = require"Drawing"
+local lshift = bit.lshift;
 
 
 
+local rpiui = require "rpiui"
 
-local dpy = EglDisplay.new(nil, EGL.EGL_OPENVG_API);
-assert(dpy, "EglDisplay not created");
+local GLES = rpiui.GLES;
+local EGL = rpiui.EGL;
+local OpenVG = rpiui.OpenVG;
+local egl = require "egl"
+
 
 local screenWidth = 640;
 local screenHeight = 480;
 
+print("EGL API: ", EGL.EGL_OPENVG_API);
+
+local mainWindow = EGL.Window.new(screenWidth, screenHeight, nil, EGL.EGL_OPENVG_API);
+--local mainWindow = EGL.Window.new(screenWidth, screenHeight, nil, EGL.EGL_OPENGLES_API);
+--local mainWindow = EGL.Window.new(screenWidth, screenHeight, nil);
+
+local RenderClass = require"Drawing"
 
 
-local Renderer = RenderClass.new(dpy, screenWidth, screenHeight);
+print("-- EGL --");
+print("Vendor: ", mainWindow.Display:Vendor());
+print("ClientAPIs: ", mainWindow.Display:ClientAPIs());
+print(string.format("Current API: 0x%x", mainWindow.Display:CurrentAPI()));
+print("Extensions: ");
+print(mainWindow.Display:Extensions());
+
+-- Create the renderer so we can do some drawing
+local Renderer = RenderClass.new(mainWindow.Display, screenWidth, screenHeight);
 
 
 
 local drawLines = function()
-	Renderer:StrokeWidth(1);
-	Renderer:SetStroke(250,250,250,1);
-	Renderer:Line(1,1, screenWidth/2, screenHeight/2);
-
+	--Renderer:Begin();
+	  Renderer:StrokeWidth(1);
+	  Renderer:SetStroke(250,250,250,1);
+	  Renderer:Line(1,1, screenWidth/2, screenHeight/2);
+	--Renderer:End();
 end
 
-local drawRectangles = function()
-	Renderer:Fill(230, 23, 23, 1);
-	Renderer:Rect(10,10,100,100);
+local drawRectangles = function(count)
+    count = count or 100;
+
+
+    --Renderer:Begin();
+    for i=1,count do
+        local width = math.random(10,250);
+        local height = math.random(10,250);
+	local x = math.random(0,screenWidth -1-width);
+	local y = math.random(0,screenHeight - 1-height);
+	  
+	local red = math.random(0,255);
+	local green = math.random(0,255);
+	local blue = math.random(0,255);
+
+	Renderer:Fill(red, green, blue, 1);
+	--print(x,y,width, height, ": ", red, green, blue);
+	Renderer:Rect(x,y,width,height);
+    end
+    --Renderer:End();
+
 end
 
 local drawEllipses = function()
 	Renderer:PushTransform();
 
-	Renderer:Translate(screenWidth/2, screenHeight/2);
-	Renderer:Fill(44, 77, 232, 1);				   -- Big blue marble
-	Renderer:Circle(0, 0, screenHeight/2);		-- The "world"
-	Renderer:Fill(255, 255, 255, 1);					-- White text
+	--Renderer:Begin();
+	  Renderer:Translate(screenWidth/2, screenHeight/2);
+	  Renderer:Fill(44, 77, 232, 1);		-- Big blue marble
+	  Renderer:Circle(0, 0, screenHeight/2);	-- The "world"
+	--Renderer:End();
 
 	Renderer:PopTransform();
 end
@@ -53,51 +84,31 @@ end
 local tick = function(ticker, tickCount)
 	print("Tick: ", tickCount);
 
+	
 	Renderer:Begin();
+	  Renderer:Background(0, 0, 0);				   -- Black background
 
-	Renderer:Background(0, 0, 0);				   -- Black background
-
-	drawEllipses();
-	drawRectangles();
-	drawLines();
-
+	  drawRectangles(255);
+	  drawEllipses();
+  	  drawLines();
 	Renderer:End();
 end
 
-
-
--- Create a window
-local winParams = {
-	ClassName = "EGLWindow",
-	Title = "EGL Window",
-	Origin = {10,10},
-	Extent = {screenWidth, screenHeight},
-	FrameRate = 3,
-
-	OnTickDelegate = tick;
-};
-
-
--- create an EGL window surface
-local win = NativeWindow.new(winParams)
-assert(win, "Window not created");
-
-local surf = dpy:CreateWindowSurface(win:GetHandle())
-
--- Make the context current
-dpy:MakeCurrent();
 
 glViewport(0,0,screenWidth,screenHeight);
 glMatrixMode(GL_PROJECTION);
 glLoadIdentity();
 
 local ratio = screenWidth/screenHeight;
-glFrustum(-ratio, ratio, -1, 1, 1, 10);
+glFrustumf(-ratio, ratio, -1, 1, 1, 10);
 
 
 -- Now, finally do some drawing
-win:Run();
+tick(RealDisplay, 1);
 
 
--- free up the display
-dpy:free();
+-- Sleep for a few seconds so we can see the results
+local seconds = 3
+print( string.format("Sleeping for %d seconds...", seconds ));
+ffi.C.sleep( seconds )
+
