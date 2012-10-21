@@ -13,10 +13,6 @@ local lshift = bit.lshift
 local DMX = require "DisplayManX"
 
 
-ALIGN_UP = function(x,y)  
-    return band((x + y-1), bnot(y-1))
-end
-
 -- This is a very simple graphics rendering routine.
 -- It will fill in a rectangle, and that's it.
 function FillRect( pbuff, x,  y,  w,  h, val)
@@ -33,55 +29,36 @@ function FillRect( pbuff, x,  y,  w,  h, val)
     end
 end
 
--- The main function of the example
-function Run(width, height)
-    width = width or 200
-    height = height or 200
+width = 400
+height = 200
 
+-- Get a connection to the display
+local Display = DMXDisplay();
+Display:SetBackground(5, 65, 65);
 
-    -- Get a connection to the display
-    local Display = DMXDisplay();
-    Display:SetBackground(5, 65, 65);
-
-    local info = Display:GetInfo();
+local info = Display:GetInfo();
     
-    print(string.format("Display is %d x %d", info.width, info.height) );
+print(string.format("Display is %d x %d", info.width, info.height) );
 
-    -- Create an image to be displayed
-    local pbuff = DMX.DMXPixelData(width, height);
+-- Create an image to be displayed
+local pbuff = DMX.DMXPixelData(width, height);
 
-
-
-    --FillRect( pbuff,  0,  0, width,      height,      0xffff );
-    FillRect( pbuff,  0,  0, width,      height,      0xF800 );
-    FillRect( pbuff, 20, 20, width - 40, height - 40, 0x07E0 );
-    FillRect( pbuff, 40, 40, width - 80, height - 80, 0x001F );
+--FillRect( pbuff,  0,  0, width,      height,      0xffff );
+FillRect( pbuff,  0,  0, width,      height,      0xF800 );
+FillRect( pbuff, 20, 20, width - 40, height - 40, 0x07E0 );
+FillRect( pbuff, 40, 40, width - 80, height - 80, 0x001F );
 
 
-    local BackingStore = DMXResource(width, height, pbuff.PixelFormat);
-
-	
-    local dst_rect = VC_RECT_T(0, 0, width, height);
-
-    -- Copy the image that was created into 
-    -- the backing store
-    BackingStore:CopyPixelBuffer(pbuff, dst_rect);
-
+--    local alpha = VC_DISPMANX_ALPHA_T( bor(ffi.C.DISPMANX_FLAGS_ALPHA_FROM_SOURCE, ffi.C.DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS), 120, 0 );
+local mainView = DMX.DMXView.new(Display, (info.width - width ) / 2, ( info.height - height ) / 2, width, height);
+mainView:CopyPixelBuffer(pbuff, 0, 0, width, height);
  
-    -- Create the view that will actually 
-    -- display the resource
-    local src_rect = VC_RECT_T( 0, 0, lshift(width, 16), lshift(height, 16) );
-    dst_rect = VC_RECT_T( (info.width - width ) / 2, ( info.height - height ) / 2, width, height );
-    local alpha = VC_DISPMANX_ALPHA_T( bor(ffi.C.DISPMANX_FLAGS_ALPHA_FROM_SOURCE, ffi.C.DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS), 120, 0 );
-    local View = Display:CreateElement(dst_rect, BackingStore, src_rect, 2000, DISPMANX_PROTECTION_NONE, alpha);
- 
+ffi.C.sleep( 2 )
 
-    -- Sleep for a second so we can see the results
-    local seconds = 2
-    print( string.format("Sleeping for %d seconds...", seconds ));
-    ffi.C.sleep( seconds )
+-- Copy a different picture
+FillRect( pbuff,  0,  0, width,      height,      0xffff );
+mainView:CopyPixelBuffer(pbuff, 0, 0, width, height);
 
-end
+ffi.C.sleep( 2 )
 
 
-Run(400, 200);

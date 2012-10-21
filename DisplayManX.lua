@@ -1,5 +1,10 @@
 
 local ffi = require "ffi"
+local bit = require "bit"
+local lshift = bit.lshift
+local rshift = bit.rshift
+local band = bit.band
+local bnot = bit.bnot
 
 -- Display manager service API
 local host = require "BcmHost"
@@ -10,6 +15,10 @@ local Native = host.Lib
 
 -- Call this instead of vc_dispman_init
 --Native.vc_vchi_dispmanx_init (VCHI_INSTANCE_T initialise_instance, VCHI_CONNECTION_T **connections, uint32_t num_connections );
+
+local ALIGN_UP = function(x,y)  
+    return band((x + y-1), bnot(y-1))
+end
 
 
 --[=[
@@ -405,7 +414,8 @@ DMXResource_mt = {
 			return DisplayManX.resource_write_data(self.Handle, imgtype, pitch, image, dst_rect);
 		end,
 
-		CopyPixelBuffer = function(self, pbuff, dst_rect)
+		CopyPixelBuffer = function(self, pbuff, x, y, width, height)
+			local dst_rect = VC_RECT_T(x, y, width, height);
 			return DisplayManX.resource_write_data(self.Handle, pbuff.PixelFormat, pbuff.Pitch, pbuff.Data, dst_rect);
 		end,
 	},
@@ -473,8 +483,8 @@ local DMXPixelData_mt = {
 
 	__gc = function(self)
 		print("GC: DMXPixelMatrix");
-		if self.DataPtr ~= nil then
-			ffi.C.free(self.DataPtr);
+		if self.Data ~= nil then
+			ffi.C.free(self.Data);
 		end
 	end,
 
@@ -485,32 +495,52 @@ local DMXPixelData_mt = {
 		local pitch = ALIGN_UP(width*sizeofpixel, 32);
 		local aligned_height = ALIGN_UP(height, 16);
 		local dataPtr = ffi.C.calloc(pitch * height, 1);
---print("DATA PTR: ", dataPtr, ffi.sizeof(dataPtr));
 		return ffi.new(ct, dataPtr, pformat, width, height, pitch);
 	end,
 }
 ffi.metatype(DMXPixelData, DMXPixelData_mt);
 
-local DMXPixelBuffer = {}
-local DMXPixelBuffer_mt = {
-	__index = DMXPixelBuffer,
+
+
+
+
+local DMXView = {}
+local DMXView_mt = {
+	__index = DMXView,
 }
 
-DMXPixelBuffer.new(width, height, pformat)
-	local pdata = DMXPixelData(width, height, pformat)
+DMXView.new = function(display, x, y, width, height, pformat, layer)
+	x = x or 0
+	y = y or 0
+	layer = layer or 0
+	pformat = pformat or ffi.C.VC_IMAGE_RGB565
 	local resource = DMXResource(width, height, pformat);
-	obj = {
-		PixelData = pdata;
+	local obj = {
+		X = x;
+		Y = y;
+		Width = width;
+		Height = height;
 		Resource = DMXResource(width, height, pformat);
+		Layer = layer;
+		Display = display;
 	}
-	setmetatable(obj, DMXPixelBuffer_mt);
+	setmetatable(obj, DMXView_mt);
+
+	obj:Show();
 
 	return obj
 end
 
-DMXPixelBuffer.CopyPixelBuffer = function(self, pbuff, x, y, width, height)
-
+DMXView.CopyPixelBuffer = function(self, pbuff, x, y, width, height)
+	self.Resource:CopyPixelBuffer(pbuff, x, y, width, height)
 end
+
+DMXView.Show = function(self)
+   local dst_rect = VC_RECT_T(self.X, self.Y, self.Width, self.Height);
+   local src_rect = VC_RECT_T( 0, 0, lshift(self.Width, 16), lshift(self.Height, 16) );
+   self.Surface = self.Display:CreateElement(dst_rect, self.Resource, src_rect, self.Layer, DISPMANX_PROTECTION_NONE, alpha);
+end
+
 
 
 
@@ -519,7 +549,7 @@ end
 
 DisplayManX.DMXPixelData = DMXPixelData;
 --DisplayManX.DMXPixelBuffer = DMXPixelBuffer;
---DisplayManX.DMXView = DMXView;
+DisplayManX.DMXView = DMXView;
 
 
 return DisplayManX
