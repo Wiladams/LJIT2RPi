@@ -165,31 +165,31 @@ typedef struct service_info_tag {
 --]]
 
 ffi.cdef[[
-extern VCHI_CONNECTION_T * vchi_create_connection( const VCHI_CONNECTION_API_T * function_table,
+VCHI_CONNECTION_T * vchi_create_connection( const VCHI_CONNECTION_API_T * function_table,
                                                    const VCHI_MESSAGE_DRIVER_T * low_level);
 
 
 // Routine used to initialise the vchi on both local + remote connections
-extern int32_t vchi_initialise( VCHI_INSTANCE_T *instance_handle );
+int32_t vchi_initialise( VCHI_INSTANCE_T *instance_handle );
 
-extern int32_t vchi_exit( void );
+int32_t vchi_exit( void );
 
-extern int32_t vchi_connect( VCHI_CONNECTION_T **connections,
+int32_t vchi_connect( VCHI_CONNECTION_T **connections,
                              const uint32_t num_connections,
                              VCHI_INSTANCE_T instance_handle );
 
 //When this is called, ensure that all services have no data pending.
 //Bulk transfers can remain 'queued'
-extern int32_t vchi_disconnect( VCHI_INSTANCE_T instance_handle );
+int32_t vchi_disconnect( VCHI_INSTANCE_T instance_handle );
 
 // Global control over bulk CRC checking
-extern int32_t vchi_crc_control( VCHI_CONNECTION_T *connection,
+int32_t vchi_crc_control( VCHI_CONNECTION_T *connection,
                                  VCHI_CRC_CONTROL_T control );
 
 // helper functions
-extern void * vchi_allocate_buffer(VCHI_SERVICE_HANDLE_T handle, uint32_t *length);
-extern void vchi_free_buffer(VCHI_SERVICE_HANDLE_T handle, void *address);
-extern uint32_t vchi_current_time(VCHI_INSTANCE_T instance_handle);
+void * vchi_allocate_buffer(VCHI_SERVICE_HANDLE_T handle, uint32_t *length);
+void vchi_free_buffer(VCHI_SERVICE_HANDLE_T handle, void *address);
+uint32_t vchi_current_time(VCHI_INSTANCE_T instance_handle);
 ]]
 
 ffi.cdef[[
@@ -280,39 +280,39 @@ ffi.cdef[[
  *****************************************************************************/
 
 // Routine to get the address of a held message
-extern void *vchi_held_msg_ptr( const VCHI_HELD_MSG_T *message );
+void *vchi_held_msg_ptr( const VCHI_HELD_MSG_T *message );
 
 // Routine to get the size of a held message
-extern int32_t vchi_held_msg_size( const VCHI_HELD_MSG_T *message );
+int32_t vchi_held_msg_size( const VCHI_HELD_MSG_T *message );
 
 // Routine to get the transmit timestamp as written into the header by the peer
-extern uint32_t vchi_held_msg_tx_timestamp( const VCHI_HELD_MSG_T *message );
+uint32_t vchi_held_msg_tx_timestamp( const VCHI_HELD_MSG_T *message );
 
 // Routine to get the reception timestamp, written as we parsed the header
-extern uint32_t vchi_held_msg_rx_timestamp( const VCHI_HELD_MSG_T *message );
+uint32_t vchi_held_msg_rx_timestamp( const VCHI_HELD_MSG_T *message );
 
 // Routine to release a held message after it has been processed
-extern int32_t vchi_held_msg_release( VCHI_HELD_MSG_T *message );
+int32_t vchi_held_msg_release( VCHI_HELD_MSG_T *message );
 
 // Indicates whether the iterator has a next message.
-extern vcos_bool_t vchi_msg_iter_has_next( const VCHI_MSG_ITER_T *iter );
+vcos_bool_t vchi_msg_iter_has_next( const VCHI_MSG_ITER_T *iter );
 
 // Return the pointer and length for the next message and advance the iterator.
-extern int32_t vchi_msg_iter_next( VCHI_MSG_ITER_T *iter,
+int32_t vchi_msg_iter_next( VCHI_MSG_ITER_T *iter,
                                    void **data,
                                    uint32_t *msg_size );
 
 // Remove the last message returned by vchi_msg_iter_next.
 // Can only be called once after each call to vchi_msg_iter_next.
-extern int32_t vchi_msg_iter_remove( VCHI_MSG_ITER_T *iter );
+int32_t vchi_msg_iter_remove( VCHI_MSG_ITER_T *iter );
 
 // Hold the last message returned by vchi_msg_iter_next.
 // Can only be called once after each call to vchi_msg_iter_next.
-extern int32_t vchi_msg_iter_hold( VCHI_MSG_ITER_T *iter,
+int32_t vchi_msg_iter_hold( VCHI_MSG_ITER_T *iter,
                                    VCHI_HELD_MSG_T *message );
 
 // Return information for the next message, and hold it, advancing the iterator.
-extern int32_t vchi_msg_iter_hold_next( VCHI_MSG_ITER_T *iter,
+int32_t vchi_msg_iter_hold_next( VCHI_MSG_ITER_T *iter,
                                         void **data,        // } may be NULL
                                         uint32_t *msg_size, // }
                                         VCHI_HELD_MSG_T *message );
@@ -324,7 +324,7 @@ ffi.cdef[[
  *****************************************************************************/
 
 // Routine to prepare interface for a transfer from the other side
-extern int32_t vchi_bulk_queue_receive( VCHI_SERVICE_HANDLE_T handle,
+int32_t vchi_bulk_queue_receive( VCHI_SERVICE_HANDLE_T handle,
                                         void *data_dst,
                                         uint32_t data_size,
                                         VCHI_FLAGS_T flags,
@@ -340,7 +340,7 @@ int32_t vchi_bulk_queue_receive_reloc( const VCHI_SERVICE_HANDLE_T handle,
                                        void * const bulk_handle );
 
 // Routine to queue up data ready for transfer to the other (once they have signalled they are ready)
-extern int32_t vchi_bulk_queue_transmit( VCHI_SERVICE_HANDLE_T handle,
+int32_t vchi_bulk_queue_transmit( VCHI_SERVICE_HANDLE_T handle,
                                          const void *data_src,
                                          uint32_t data_size,
                                          VCHI_FLAGS_T flags,
@@ -353,7 +353,7 @@ ffi.cdef[[
  *****************************************************************************/
 
 // function prototypes for the different mid layers (the state info gives the different physical connections)
-extern const VCHI_CONNECTION_API_T *single_get_func_table( void );
+const VCHI_CONNECTION_API_T *single_get_func_table( void );
 //extern const VCHI_CONNECTION_API_T *local_server_get_func_table( void );
 //extern const VCHI_CONNECTION_API_T *local_client_get_func_table( void );
 
@@ -362,7 +362,7 @@ const VCHI_MESSAGE_DRIVER_T *vchi_mphi_message_driver_func_table( void );
 ]]
 
 ffi.cdef[[
-extern int32_t vchi_bulk_queue_transmit_reloc( VCHI_SERVICE_HANDLE_T handle,
+int32_t vchi_bulk_queue_transmit_reloc( VCHI_SERVICE_HANDLE_T handle,
                                                VCHI_MEM_HANDLE_T h_src,
                                                uint32_t offset,
                                                uint32_t data_size,
@@ -370,29 +370,7 @@ extern int32_t vchi_bulk_queue_transmit_reloc( VCHI_SERVICE_HANDLE_T handle,
                                                void *transfer_handle );
 ]]
 
---[[
-Copyright (c) 2012, Broadcom Europe Ltd
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of the copyright holder nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
---]]
+return {
+	Lib = ffi.load("vchiq_arm"),
+}

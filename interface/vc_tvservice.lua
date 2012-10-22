@@ -70,20 +70,17 @@ int vc_tv_hdmi_power_on_best_3d(uint32_t width, uint32_t height, uint32_t frame_
 int vc_tv_hdmi_power_on_explicit(HDMI_MODE_T mode, HDMI_RES_GROUP_T group, uint32_t code);
 
 int vc_tv_hdmi_get_supported_modes(HDMI_RES_GROUP_T group,
-                                                    TV_SUPPORTED_MODE_T *supported_modes,
-                                                    uint32_t max_supported_modes,
-                                                    HDMI_RES_GROUP_T *preferred_group,
-                                                    uint32_t *preferred_mode);
+                                              TV_SUPPORTED_MODE_T *supported_modes,
+                                              uint32_t max_supported_modes,
+                                              HDMI_RES_GROUP_T *preferred_group,
+                                              uint32_t *preferred_mode);
 
 
-int vc_tv_hdmi_mode_supported(HDMI_RES_GROUP_T group,
-                                               uint32_t mode);
+int vc_tv_hdmi_mode_supported(HDMI_RES_GROUP_T group, uint32_t mode);
 
-int vc_tv_hdmi_audio_supported(uint32_t audio_format, uint32_t num_channels,
-                                                EDID_AudioSampleRate fs, uint32_t bitrate);
+int vc_tv_hdmi_audio_supported(uint32_t audio_format, uint32_t num_channels, EDID_AudioSampleRate fs, uint32_t bitrate);
 
 int vc_tv_hdmi_get_av_latency( void );
-
 
 int vc_tv_hdmi_set_hdcp_key(const uint8_t *key);
 

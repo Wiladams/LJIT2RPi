@@ -50,7 +50,7 @@ FillRect( pbuff, 40, 40, width - 80, height - 80, 0x001F );
 
 
 --    local alpha = VC_DISPMANX_ALPHA_T( bor(ffi.C.DISPMANX_FLAGS_ALPHA_FROM_SOURCE, ffi.C.DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS), 120, 0 );
-local mainView = DMX.DMXView.new(Display, (info.width - width ) / 2, ( info.height - height ) / 2, width, height);
+mainView = Display:CreateView(width, height, 0, info.height-height, nil, nil, 0.5);
 mainView:CopyPixelBuffer(pbuff, 0, 0, width, height);
  
 ffi.C.sleep( 2 )

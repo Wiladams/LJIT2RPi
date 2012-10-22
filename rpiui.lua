@@ -4,6 +4,8 @@ local ffi = require "ffi"
 local BCMHost = require "BcmHost"
 
 
+local vchiq_arm_Lib = ffi.load("vchiq_arm");
+
 --[[
 	GLESv2 must be loaded before EGL or there will be 
 	an error: 
@@ -22,7 +24,6 @@ local OpenVG = require "OpenVG_Utils";
 
 --local mmal_Lib = ffi.load("mmal");
 --local openmaxil_Lib = ffi.load("openmaxil");
---local vchiq_arm_Lib = ffi.load("vchiq_arm");
 --local WFC_Lib = ffi.load("WFC");
 
 

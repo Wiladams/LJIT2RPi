@@ -4,6 +4,7 @@ local bit = require "bit"
 local lshift = bit.lshift
 local rshift = bit.rshift
 local band = bit.band
+local bor = bit.bor
 local bnot = bit.bnot
 
 -- Display manager service API
@@ -327,6 +328,18 @@ DMXDisplay_mt = {
 			return element
 		end,
 
+		CreateView = function(self, width, height, x, y, level, pFormat, opacity)
+			x = x or 0
+			y = y or 0
+			level = level or 0
+			pformat = pformat or ffi.C.VC_IMAGE_RGB565
+			
+			resource = resource or DMXResource(width, height, pformat);
+
+			local win = DisplayManX.DMXView.new(self, x, y, width, height, layer, pformat, resource, opacity)
+			
+			return win;
+		end,
 
 		GetInfo = function(self)
 			return DisplayManX.get_info(self.Handle);
@@ -515,12 +528,13 @@ local DMXView_mt = {
 	__index = DMXView,
 }
 
-DMXView.new = function(display, x, y, width, height, layer, pformat, resource)
+DMXView.new = function(display, x, y, width, height, layer, pformat, resource, opacity)
 	x = x or 0
 	y = y or 0
 	layer = layer or 0
 	pformat = pformat or ffi.C.VC_IMAGE_RGB565
 	resource = resource or DMXResource(width, height, pformat);
+	opacity = opacity or 1.0;
 
 	local obj = {
 		X = x;
@@ -530,6 +544,7 @@ DMXView.new = function(display, x, y, width, height, layer, pformat, resource)
 		Resource = resource;
 		Layer = layer;
 		Display = display;
+		Opacity = opacity;
 	}
 	setmetatable(obj, DMXView_mt);
 
@@ -553,9 +568,15 @@ DMXView.Hide = function(self)
 end
 
 DMXView.Show = function(self)
-   local dst_rect = VC_RECT_T(self.X, self.Y, self.Width, self.Height);
-   local src_rect = VC_RECT_T( 0, 0, lshift(self.Width, 16), lshift(self.Height, 16) );
-   self.Surface = self.Display:CreateElement(dst_rect, self.Resource, src_rect, self.Layer, DISPMANX_PROTECTION_NONE, alpha);
+	local dst_rect = VC_RECT_T(self.X, self.Y, self.Width, self.Height);
+	local src_rect = VC_RECT_T( 0, 0, lshift(self.Width, 16), lshift(self.Height, 16) );
+
+	local alpha = nil;
+	if self.Opacity and self.Opacity >= 0 and self.Opacity < 1.0 then
+		alpha = VC_DISPMANX_ALPHA_T( bor(ffi.C.DISPMANX_FLAGS_ALPHA_FROM_SOURCE, ffi.C.DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS), self.Opacity * 255, 0 );
+	end
+   	
+	self.Surface = self.Display:CreateElement(dst_rect, self.Resource, src_rect, self.Layer, DISPMANX_PROTECTION_NONE, alpha);
 end
 
 

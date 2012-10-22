@@ -10,15 +10,19 @@ int32_t graphics_get_display_size( const uint16_t display_number, uint32_t *widt
 ]]
 
 require "libc"
+
 require "interface/vc_dispmanx"
 require "interface/vc_tvservice"
+require "interface/vcgencmd"
 
 --[[
 
 require "interface/vmcs_host/vc_cec"
 require "interface/vmcs_host/vc_cecservice"
-require "interface/vmcs_host/vcgencmd"
 --]]
 
 
 
+return {
+	
+}

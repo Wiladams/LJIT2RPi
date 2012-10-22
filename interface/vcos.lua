@@ -56,7 +56,8 @@ require "../vcos/vcos_cmd.h"
 
 
 local vcos_Lib = ffi.load("vcos");
-vcos_Lib.vcos_init();
+local result = vcos_Lib.vcos_init();
+print("VCOS INIT: ", result);
 
 return {
 	Lib = vcos_Lib;
