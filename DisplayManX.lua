@@ -9,7 +9,7 @@ local bnot = bit.bnot
 
 -- Display manager service API
 local host = require "BcmHost"
-local Native = host.Lib
+local Native = host.bcm_host_lib
 
 -- Initialize module
 --Native.vc_dispman_init();
@@ -66,7 +66,7 @@ DisplayManX = {
 		local resource = Native.vc_dispmanx_resource_create( imgtype, width, height, phandle );
 		
 		if resource >0  then
-			return resource, phandle[0]
+			return resource
 		end
 
 		return false, resource
@@ -248,7 +248,9 @@ struct DMXElement {
 
 struct DMXResource {
 	DISPMANX_RESOURCE_HANDLE_T	Handle;
-	uint32_t			ImagePtr;
+	int32_t				Width;
+	int32_t				Height;
+	VC_IMAGE_TYPE_T			PixelFormat;
 };		
 ]]
 
@@ -332,11 +334,11 @@ DMXDisplay_mt = {
 			x = x or 0
 			y = y or 0
 			level = level or 0
-			pformat = pformat or ffi.C.VC_IMAGE_RGB565
+			pFormat = pFormat or ffi.C.VC_IMAGE_RGB565
 			
-			resource = resource or DMXResource(width, height, pformat);
+			resource = resource or DMXResource(width, height, pFormat);
 
-			local win = DisplayManX.DMXView.new(self, x, y, width, height, layer, pformat, resource, opacity)
+			local win = DisplayManX.DMXView.new(self, x, y, width, height, layer, pFormat, resource, opacity)
 			
 			return win;
 		end,
@@ -419,12 +421,12 @@ DMXResource_mt = {
 
 	__new = function(ct, width, height, imgtype)
 		imgtype = imgtype or ffi.C.VC_IMAGE_RGB565;
-		local handle, imgptr = DisplayManX.resource_create(imgtype, width, height);
+		local handle, err = DisplayManX.resource_create(imgtype, width, height);
 		if not handle then
-			return nil, imgptr
+			return nil, err
 		end
 
-		local obj = ffi.new(ct, handle, imgptr);
+		local obj = ffi.new(ct, handle, width, height, imgtype);
 		return obj;
 	end,
 
@@ -436,6 +438,26 @@ DMXResource_mt = {
 		CopyPixelBuffer = function(self, pbuff, x, y, width, height)
 			local dst_rect = VC_RECT_T(x, y, width, height);
 			return DisplayManX.resource_write_data(self.Handle, pbuff.PixelFormat, pbuff.Pitch, pbuff.Data, dst_rect);
+		end,
+
+		ReadPixelData = function(self, pixdata, p_rect)
+			local p_rect = p_rect or VC_RECT_T(0,0,self.Width, self.Height);
+			local pixdata = pixdata or self:CreateCompatiblePixmap(p_rect.width, p_rect.height);
+ 	
+			local success, err = DisplayManX.resource_read_data (self.Handle, p_rect, pixdata.Data, pixdata.Pitch)
+
+			if success then
+				return pixdata;
+			end
+
+			return false, result;
+		end,
+
+		CreateCompatiblePixmap = function(self, width, height)
+			width = width or self.Width;
+			height = height or self.Height;
+
+			return DisplayManX.DMXPixelData(width, height, self.PixelFormat);
 		end,
 	},
 }
@@ -497,6 +519,11 @@ struct DMXPixelData {
 };
 ]]
 
+local pixelSizes = {
+	[tonumber(ffi.C.VC_IMAGE_RGB565)] = 2,
+	[tonumber(ffi.C.VC_IMAGE_RGB888)] = 3,
+}
+
 local DMXPixelData = ffi.typeof("struct DMXPixelData");
 local DMXPixelData_mt = {
 
@@ -509,7 +536,8 @@ local DMXPixelData_mt = {
 
 	__new = function(ct, width, height, pformat)
 		pformat = pformat or ffi.C.VC_IMAGE_RGB565
-		local sizeofpixel = 2;
+print("DMXPixelData(), pformat: ", pformat);
+		local sizeofpixel = pixelSizes[tonumber(pformat)];
 
 		local pitch = ALIGN_UP(width*sizeofpixel, 32);
 		local aligned_height = ALIGN_UP(height, 16);
