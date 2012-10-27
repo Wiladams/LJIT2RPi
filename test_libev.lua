@@ -3,7 +3,7 @@ local ffi = require "ffi"
 
 local ev = require "ev_utils"
 local S = require "syscall"
---local UI = require "input"
+local UI = require "input"
 
 --print("EV Version: ", ev.version());
 
@@ -24,27 +24,43 @@ function OnIdle(loop, ...)
 	print("Idling");
 end
 
-ffi.cdef[[
-struct input_event {
-	struct timeval time;
-	uint16_t type;
-	uint16_t code;
-	int32_t  value;
-};
 
-]]
-input_event = ffi.typeof("struct input_event");
 
-function OnIO(loop, w, revents)
+--[[
+	Event type:
+		EV_KEY
+		EV_MSC
+
+	value:
+		0 == keyup
+		1 == keydown
+--]]
+
+function OnKey(loop, w, revents)
 	local event = input_event();
 	local bytesread = S.read(w.fd, event, ffi.sizeof(event));
 
-	if event.type == 0 then
-		return
-	end
 
-	
-	print("KEY: ", event.type, "SCAN: ", event.code, string.format("0x%x",event.value));
+	if event.type == EV_MSC then
+		if event.code == MSC_SCAN then
+			--print("MSC_SCAN: ", string.format("0x%x",event.value));
+		else
+			--print("MSC: ", event.code, event.value);
+		end
+	elseif event.type == EV_KEY then
+		if event.value == 1 then
+			print("KEYDOWN: ", event.code);
+		elseif event.value == 0 then
+			if event.code == KEY_ESC then
+				loop:halt();
+				return false;
+			end
+
+			print("KEYUP: ", event.code);
+		end
+	else
+		--print("EVENT TYPE: ", UI.EventTypes[event.type][2], "CODE:",event.code, "VALUE: ", string.format("0x%x",event.value));
+	end
 end
 
 function OnMouse(loop, w, revents)
@@ -57,7 +73,7 @@ end
 
 
 --[[ 
-	Create Watchers
+	Create Observers
 --]]
 
 local idler = ev.ev_idle(OnIdle);
@@ -68,9 +84,9 @@ local timer = ev.ev_timer(OnTimeout, 1, 2)
 
 -- Keyboard Tracking
 local fd = S.open("/dev/input/event0", "O_RDONLY");
-local ifd = fd:getfd();
-print("FD: ", fd, ifd);
-local iowatcher = ev.ev_io(OnIO, ifd, ffi.C.EV_READ);
+local kfd = fd:getfd();
+print("FD: ", fd, kfd);
+local iowatcher = ev.ev_io(OnKey, kfd, ffi.C.EV_READ);
 iowatcher:start(loop, true);
 
 -- Mouse Tracking
