@@ -1,3 +1,5 @@
+package.path = package.path..";../?.lua"
+
 -- test suite for ljsyscall.
 
 local strict = require "strict"
