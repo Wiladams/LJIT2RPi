@@ -830,20 +830,35 @@ local MSCEvents = {
  * LEDs
  --]]
 
-LED_NUML		= 0x00;
+LED_NUML	                = 0x00;
 LED_CAPSL		= 0x01;
 LED_SCROLLL		= 0x02;
 LED_COMPOSE		= 0x03;
-LED_KANA		= 0x04;
+LED_KANA			= 0x04;
 LED_SLEEP		= 0x05;
 LED_SUSPEND		= 0x06;
-LED_MUTE		= 0x07;
-LED_MISC		= 0x08;
-LED_MAIL		= 0x09;
-LED_CHARGING	= 0x0a;
+LED_MUTE			= 0x07;
+LED_MISC			= 0x08;
+LED_MAIL			= 0x09;
+LED_CHARGING		= 0x0a;
 LED_MAX			= 0x0f;
 LED_CNT			= (LED_MAX+1);
 
+local LEDs = {
+	[LED_NUML] = {0x00, "LED_NUML"},
+	[LED_CAPSL] = {0x01, "LED_CAPSL"},
+	[LED_SCROLLL] = {0x02, "LED_SCROLLL"},
+	[LED_COMPOSE] = {0x03, "LED_COMPOSE"},
+	[LED_KANA] = {0x04, "LED_COMPOSE"},
+	[LED_SLEEP] = {0x05, "LED_SLEEP"},
+	[LED_SUSPEND] = {0x06, "LED_SUSPEND"},
+	[LED_MUTE] = {0x07, "LED_MUTE"},
+	[LED_MISC] = {0x08, "LED_MISC"},
+	[LED_MAIL] = {0x09, "LED_MAIL"},
+	[LED_CHARGING] = {0x0a, "LED_CHARGING"},
+	[LED_MAX] = {0x0f, "LED_MAX"},
+}
+ 
 --[[
  * Autorepeat values
  --]]
@@ -1143,38 +1158,38 @@ FF_CNT			= (FF_MAX+1);
 --[[
 	Device Driver Helpers
 --]]
-local byte = string.byte
+local B = string.byte
 local int = ffi.typeof("int")
 
-EVIOCGVERSION		= _IOR(byte'E', 0x01, ffi.typeof("int"))			--[[ get driver version --]]
-EVIOCGID		= _IOR(byte'E', 0x02, ffi.typeof("struct input_id"))	--[[ get device ID --]]
-EVIOCGREP		= _IOR(byte'E', 0x03, ffi.typeof("unsigned int[2]"))	--[[ get repeat settings --]]
-EVIOCSREP		= _IOW(byte'E', 0x03, ffi.typeof("unsigned int[2]"))	--[[ set repeat settings --]]
+EVIOCGVERSION	= _IOR(B'E', 0x01, ffi.typeof("int"))			--[[ get driver version --]]
+EVIOCGID			= _IOR(B'E', 0x02, ffi.typeof("struct input_id"))	--[[ get device ID --]]
+EVIOCGREP		= _IOR(B'E', 0x03, ffi.typeof("unsigned int[2]"))	--[[ get repeat settings --]]
+EVIOCSREP		= _IOW(B'E', 0x03, ffi.typeof("unsigned int[2]"))	--[[ set repeat settings --]]
 
-EVIOCGKEYCODE		= _IOR(byte'E', 0x04, ffi.typeof("unsigned int[2]"))    --[[ get keycode --]]
-EVIOCGKEYCODE_V2	= _IOR(byte'E', 0x04, ffi.typeof("struct input_keymap_entry"))
-EVIOCSKEYCODE		= _IOW(byte'E', 0x04, ffi.typeof("unsigned int[2]"))        --[[ set keycode --]]
-EVIOCSKEYCODE_V2	= _IOW(byte'E', 0x04, ffi.typeof("struct input_keymap_entry"))
+EVIOCGKEYCODE	= _IOR(B'E', 0x04, ffi.typeof("unsigned int[2]"))    --[[ get keycode --]]
+EVIOCGKEYCODE_V2	= _IOR(B'E', 0x04, ffi.typeof("struct input_keymap_entry"))
+EVIOCSKEYCODE	= _IOW(B'E', 0x04, ffi.typeof("unsigned int[2]"))        --[[ set keycode --]]
+EVIOCSKEYCODE_V2	= _IOW(B'E', 0x04, ffi.typeof("struct input_keymap_entry"))
 
-EVIOCGNAME = function(len) return _IOC(_IOC_READ, byte'E', 0x06, len) end	--[[ get device name --]]
-EVIOCGPHYS = function(len) return _IOC(_IOC_READ, byte'E', 0x07, len) end	--[[ get physical location --]]
-EVIOCGUNIQ = function(len) return _IOC(_IOC_READ, byte'E', 0x08, len) end	--[[ get unique identifier --]]
-EVIOCGPROP = function(len) return _IOC(_IOC_READ, byte'E', 0x09, len) end	--[[ get device properties --]]
+EVIOCGNAME = function(len) return _IOC(_IOC_READ, B'E', 0x06, len) end	--[[ get device name --]]
+EVIOCGPHYS = function(len) return _IOC(_IOC_READ, B'E', 0x07, len) end	--[[ get physical location --]]
+EVIOCGUNIQ = function(len) return _IOC(_IOC_READ, B'E', 0x08, len) end	--[[ get unique identifier --]]
+EVIOCGPROP = function(len) return _IOC(_IOC_READ, B'E', 0x09, len) end	--[[ get device properties --]]
 
-EVIOCGKEY  = function(len) return _IOC(_IOC_READ, byte'E', 0x18, len) end	--[[ get global key state --]]
-EVIOCGLED  = function(len) return _IOC(_IOC_READ, byte'E', 0x19, len) end	--[[ get all LEDs --]]
-EVIOCGSND  = function(len) return _IOC(_IOC_READ, byte'E', 0x1a, len) end	--[[ get all sounds status --]]
-EVIOCGSW   = function(len) return _IOC(_IOC_READ, byte'E', 0x1b, len) end	--[[ get all switch states --]]
+EVIOCGKEY  = function(len) return _IOC(_IOC_READ, B'E', 0x18, len) end	--[[ get global key state --]]
+EVIOCGLED  = function(len) return _IOC(_IOC_READ, B'E', 0x19, len) end	--[[ get all LEDs --]]
+EVIOCGSND  = function(len) return _IOC(_IOC_READ, B'E', 0x1a, len) end	--[[ get all sounds status --]]
+EVIOCGSW   = function(len) return _IOC(_IOC_READ, B'E', 0x1b, len) end	--[[ get all switch states --]]
 
-EVIOCGBIT  = function(ev,len) return _IOC(_IOC_READ, byte'E', 0x20 + ev, len) end	--[[ get event bits --]]
-EVIOCGABS  = function(abs) return _IOR(byte'E', 0x40 + (abs), ffi.typeof("struct input_absinfo")) end	--[[ get abs value/limits --]]
-EVIOCSABS  = function(abs) return _IOW(byte'E', 0xc0 + (abs), ffi.typeof("struct input_absinfo")) end	--[[ set abs value/limits --]]
+EVIOCGBIT  = function(ev,len) return _IOC(_IOC_READ, B'E', 0x20 + ev, len) end	--[[ get event bits --]]
+EVIOCGABS  = function(abs) return _IOR(B'E', 0x40 + (abs), ffi.typeof("struct input_absinfo")) end	--[[ get abs value/limits --]]
+EVIOCSABS  = function(abs) return _IOW(B'E', 0xc0 + (abs), ffi.typeof("struct input_absinfo")) end	--[[ set abs value/limits --]]
 
-EVIOCSFF	=	_IOC(_IOC_WRITE, byte'E', 0x80, ffi.sizeof("struct ff_effect"))	--[[ send a force effect to a force feedback device --]]
-EVIOCRMFF	=	_IOW(byte'E', 0x81, int)			--[[ Erase a force effect --]]
-EVIOCGEFFECTS	=	_IOR(byte'E', 0x84, int)			--[[ Report number of effects playable at the same time --]]
+EVIOCSFF			=	_IOC(_IOC_WRITE, B'E', 0x80, ffi.sizeof("struct ff_effect"))	--[[ send a force effect to a force feedback device --]]
+EVIOCRMFF		=	_IOW(B'E', 0x81, int)			--[[ Erase a force effect --]]
+EVIOCGEFFECTS	=	_IOR(B'E', 0x84, int)			--[[ Report number of effects playable at the same time --]]
 
-EVIOCGRAB	=	_IOW(byte'E', 0x90, int)			--[[ Grab/Release device --]]
+EVIOCGRAB		=	_IOW(B'E', 0x90, int)			--[[ Grab/Release device --]]
 
 
 input_event = ffi.typeof("struct input_event");
@@ -1182,4 +1197,5 @@ input_event = ffi.typeof("struct input_event");
 return {
 	EventTypes = EventTypes,
 	MSCEvents = MSCEvents,
+	LEDs = LEDs,
 }
