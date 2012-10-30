@@ -3,10 +3,19 @@
 -- so far almost all the single flag options have been converted to seperate tables with metamethods but still TODO
 -- are the multi flag ones
 
+-- TODO add test that we do not reallocate
+-- TODO move to new table k rather than in S
+
 local ffi = require "ffi"
 local bit = require "bit"
 
 local arch = require("include/constants-" .. ffi.arch) -- architecture specific code
+
+local oldsm = setmetatable
+local function setmetatable(t, mt)
+  assert(mt, "BUG: nil metatable")
+  return oldsm(t, mt)
+end
 
 local function octal(s) return tonumber(s, 8) end 
 
@@ -33,12 +42,12 @@ local function trim(s) -- TODO should replace underscore with space
 end
 
 -- for single valued flags only
-local function strflag(t, str)
+local function flag(t, str)
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   if #str == 0 then return 0 end
   local val = rawget(t, str)
-  if val then return val end  
+  if val then return val end
   local s = trim(str):upper()
   if #s == 0 then return 0 end
   local val = rawget(t, s)
@@ -47,13 +56,49 @@ local function strflag(t, str)
   return val
 end
 
-local stringflag = {__index = strflag, __call = function(t, a) return t[a] end}
+local stringflag = {__index = flag, __call = function(t, a) return t[a] end}
 
-local S = {} -- TODO rename
+-- take a bunch of flags in a string and return a number
+function flags(t, str) -- allows multiple comma sep flags that are ORed
+  if not str then return 0 end
+  if type(str) ~= "string" then return str end
+  if #str == 0 then return 0 end
+  local val = rawget(t, str)
+  if val then return val end
+  local f = 0
+  local a = split(",", str)
+  for i, v in ipairs(a) do
+    local s = trim(v):upper()
+    local val = rawget(t, s)
+    if not val then return nil end
+    f = bit.bor(f, val)
+  end
+  t[str] = f
+  return f
+end
 
-S.SYS = arch.SYS
+local multiflags = {__index = flags, __call = function(t, a) return t[a] end}
 
-S.STD = setmetatable({
+-- single char flags, eg used for access which allows "rwx"
+local function chflags(t, s)
+  if not s then return 0 end
+  if type(s) ~= "string" then return s end
+  s = trim(s:upper())
+  local flag = 0
+  for i = 1, #s do
+    local c = s:sub(i, i)
+    flag = bit.bor(flag, t[c])
+  end
+  return flag
+end
+
+local charflags = {__index = chflags, __call = function(t, a) return t[a] end}
+
+local c = {}
+
+c.SYS = arch.SYS
+
+c.STD = setmetatable({
   IN_FILENO = 0,
   OUT_FILENO = 1,
   ERR_FILENO = 2,
@@ -63,73 +108,111 @@ S.STD = setmetatable({
 }, stringflag)
 
 -- sizes
-S.PATH_MAX = 4096
+c.PATH_MAX = 4096
 
--- open, fcntl
-S.O_ACCMODE   = octal('0003')
-S.O_RDONLY    = octal('00')
-S.O_WRONLY    = octal('01')
-S.O_RDWR      = octal('02')
-S.O_CREAT     = octal('0100')
-S.O_EXCL      = octal('0200')
-S.O_NOCTTY    = octal('0400')
-S.O_TRUNC     = octal('01000')
-S.O_APPEND    = octal('02000')
-S.O_NONBLOCK  = octal('04000')
-S.O_NDELAY    = S.O_NONBLOCK
-S.O_SYNC      = octal('04010000')
-S.O_FSYNC     = S.O_SYNC
-S.O_ASYNC     = octal('020000')
-S.O_CLOEXEC   = octal('02000000')
-S.O_NOATIME   = octal('01000000')
-S.O_DSYNC     = octal('010000')
-S.O_RSYNC     = S.O_SYNC
+-- open, fcntl TODO must set LARGEFILE if needed (note pipe2 only uses nonblock and cloexec)
+c.O = {
+  RDONLY    = octal('0000'),
+  WRONLY    = octal('0001'),
+  RDWR      = octal('0002'),
+  ACCMODE   = octal('0003'),
+  CREAT     = octal('0100'),
+  EXCL      = octal('0200'),
+  NOCTTY    = octal('0400'),
+  TRUNC     = octal('01000'),
+  APPEND    = octal('02000'),
+  NONBLOCK  = octal('04000'),
+  DSYNC     = octal('010000'),
+  ASYNC     = octal('020000'),
+  NOATIME   = octal('01000000'),
+  CLOEXEC   = octal('02000000'),
+  SYNC      = octal('04010000'),
+}
 
--- incorporate into metatable for O so set as O>LARGEFILE or 0
-if ffi.abi("32bit") then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end
+c.O.FSYNC     = c.O.SYNC
+c.O.RSYNC     = c.O.SYNC
+c.O.NDELAY    = c.O.NONBLOCK
+
+-- any use of a string will add largefile. If you use flags directly you need to add it yourself.
+-- if there is a problem use a different table eg OPIPE
+if ffi.abi("32bit") then
+  c.O.LARGEFILE = octal('0100000')
+  setmetatable(c.O, {
+    __index = function(t, str)
+      return bit.bor(flags(t, str), c.O.LARGEFILE)
+    end,
+    __call = multiflags.__call,
+  })
+else
+  c.O.LARGEFILE = 0
+  setmetatable(c.O, multiflags)
+end
 
 -- these are arch dependent!
 if arch.oflags then arch.oflags(S)
 else -- generic values from asm-generic
-  S.O_DIRECTORY = octal('0200000')
-  S.O_NOFOLLOW  = octal('0400000')
-  S.O_DIRECT    = octal('040000')
+  c.O.DIRECT    = octal('040000')
+  c.O.DIRECTORY = octal('0200000')
+  c.O.NOFOLLOW  = octal('0400000')
 end
 
--- modes
-S.S_IFMT   = octal('0170000')
-S.S_IFSOCK = octal('0140000')
-S.S_IFLNK  = octal('0120000')
-S.S_IFREG  = octal('0100000')
-S.S_IFBLK  = octal('0060000')
-S.S_IFDIR  = octal('0040000')
-S.S_IFCHR  = octal('0020000')
-S.S_IFIFO  = octal('0010000')
-S.S_ISUID  = octal('0004000')
-S.S_ISGID  = octal('0002000')
-S.S_ISVTX  = octal('0001000')
+c.OPIPE = setmetatable({
+  NONBLOCK  = octal('04000'),
+  CLOEXEC   = octal('02000000'),
+}, multiflags)
 
-S.S_IRWXU = octal('00700')
-S.S_IRUSR = octal('00400')
-S.S_IWUSR = octal('00200')
-S.S_IXUSR = octal('00100')
-S.S_IRWXG = octal('00070')
-S.S_IRGRP = octal('00040')
-S.S_IWGRP = octal('00020')
-S.S_IXGRP = octal('00010')
-S.S_IRWXO = octal('00007')
-S.S_IROTH = octal('00004')
-S.S_IWOTH = octal('00002')
-S.S_IXOTH = octal('00001')
+-- modes and file types. note renamed second set from S_ to MODE_ plus note split
+c.S = setmetatable({
+  IFMT   = octal('0170000'),
+  IFSOCK = octal('0140000'),
+  IFLNK  = octal('0120000'),
+  IFREG  = octal('0100000'),
+  IFBLK  = octal('0060000'),
+  IFDIR  = octal('0040000'),
+  IFCHR  = octal('0020000'),
+  IFIFO  = octal('0010000'),
+  ISUID  = octal('0004000'),
+  ISGID  = octal('0002000'),
+  ISVTX  = octal('0001000'),
+  IRWXU  = octal('00700'),
+  IRUSR  = octal('00400'),
+  IWUSR  = octal('00200'),
+  IXUSR  = octal('00100'),
+  IRWXG  = octal('00070'),
+  IRGRP  = octal('00040'),
+  IWGRP  = octal('00020'),
+  IXGRP  = octal('00010'),
+  IRWXO  = octal('00007'),
+  IROTH  = octal('00004'),
+  IWOTH  = octal('00002'),
+  IXOTH  = octal('00001'),
+}, multiflags)
+
+c.MODE = setmetatable({
+  IRWXU = octal('00700'),
+  IRUSR = octal('00400'),
+  IWUSR = octal('00200'),
+  IXUSR = octal('00100'),
+  IRWXG = octal('00070'),
+  IRGRP = octal('00040'),
+  IWGRP = octal('00020'),
+  IXGRP = octal('00010'),
+  IRWXO = octal('00007'),
+  IROTH = octal('00004'),
+  IWOTH = octal('00002'),
+  IXOTH = octal('00001'),
+}, multiflags)
 
 -- access
-S.R_OK = 4
-S.W_OK = 2
-S.X_OK = 1
-S.F_OK = 0
+c.OK = setmetatable({
+  R = 4,
+  W = 2,
+  X = 1,
+  F = 0,
+}, charflags)
 
 -- fcntl
-S.F = setmetatable({
+c.F = setmetatable({
   DUPFD       = 0,
   GETFD       = 1,
   SETFD       = 2,
@@ -157,26 +240,28 @@ S.F = setmetatable({
 
 -- messy
 if ffi.abi("64bit") then
-  S.F.GETLK64   = S.F.GETLK
-  S.F.SETLK64   = S.F.SETLK
-  S.F.SETLKW64  = S.F.SETLKW
+  c.F.GETLK64   = c.F.GETLK
+  c.F.SETLK64   = c.F.SETLK
+  c.F.SETLKW64  = c.F.SETLKW
 else
-  S.F.GETLK     = S.F.GETLK64
-  S.F.SETLK     = S.F.SETLK64
-  S.F.SETLKW    = S.F.SETLKW64
+  c.F.GETLK     = c.F.GETLK64
+  c.F.SETLK     = c.F.SETLK64
+  c.F.SETLKW    = c.F.SETLKW64
 end
 
-S.FD_CLOEXEC = 1
+c.FD = setmetatable({
+  CLOEXEC = 1,
+}, multiflags)
 
 -- note changed from F_ to FCNTL_LOCK
-S.FCNTL_LOCK = setmetatable({
+c.FCNTL_LOCK = setmetatable({
   RDLCK = 0,
   WRLCK = 1,
   UNLCK = 2,
 }, stringflag)
 
 -- lockf, changed from F_ to LOCKF_
-S.LOCKF = setmetatable({
+c.LOCKF = setmetatable({
   ULOCK = 0,
   LOCK  = 1,
   TLOCK = 2,
@@ -184,42 +269,52 @@ S.LOCKF = setmetatable({
 }, stringflag)
 
 --mmap
-S.PROT_READ  = 0x1
-S.PROT_WRITE = 0x2
-S.PROT_EXEC  = 0x4
-S.PROT_NONE  = 0x0
-S.PROT_GROWSDOWN = 0x01000000
-S.PROT_GROWSUP   = 0x02000000
+c.PROT = setmetatable({
+  NONE  = 0x0,
+  READ  = 0x1,
+  WRITE = 0x2,
+  EXEC  = 0x4,
+  GROWSDOWN = 0x01000000,
+  GROWSUP   = 0x02000000,
+}, multiflags)
 
 -- Sharing types
-S.MAP_SHARED  = 0x01
-S.MAP_PRIVATE = 0x02
-S.MAP_TYPE    = 0x0f
-S.MAP_FIXED     = 0x10
-S.MAP_FILE      = 0
-S.MAP_ANONYMOUS = 0x20
-S.MAP_ANON      = S.MAP_ANONYMOUS
-S.MAP_32BIT     = 0x40
-S.MAP_GROWSDOWN  = 0x00100
-S.MAP_DENYWRITE  = 0x00800
-S.MAP_EXECUTABLE = 0x01000
-S.MAP_LOCKED     = 0x02000
-S.MAP_NORESERVE  = 0x04000
-S.MAP_POPULATE   = 0x08000
-S.MAP_NONBLOCK   = 0x10000
-S.MAP_STACK      = 0x20000
-S.MAP_HUGETLB    = 0x40000
+c.MAP = setmetatable({
+  FILE       = 0,
+  SHARED     = 0x01,
+  PRIVATE    = 0x02,
+  TYPE       = 0x0f,
+  FIXED      = 0x10,
+  ANONYMOUS  = 0x20,
+--32BIT      = 0x40,
+  GROWSDOWN  = 0x00100,
+  DENYWRITE  = 0x00800,
+  EXECUTABLE = 0x01000,
+  LOCKED     = 0x02000,
+  NORESERVE  = 0x04000,
+  POPULATE   = 0x08000,
+  NONBLOCK   = 0x10000,
+  STACK      = 0x20000,
+  HUGETLB    = 0x40000,
+}, multiflags)
+
+c.MAP["32BIT"]   = 0x40 -- starts with number
+c.MAP.ANON       = c.MAP.ANONYMOUS
 
 -- flags for `mlockall'.
-S.MCL_CURRENT    = 1
-S.MCL_FUTURE     = 2
+c.MCL = setmetatable({
+  CURRENT    = 1,
+  FUTURE     = 2,
+}, multiflags)
 
 -- flags for `mremap'.
-S.MREMAP_MAYMOVE = 1
-S.MREMAP_FIXED   = 2
+c.MREMAP = setmetatable({
+  MAYMOVE = 1,
+  FIXED   = 2,
+}, multiflags)
 
 -- madvise advice parameter
-S.MADV = setmetatable({
+c.MADV = setmetatable({
   NORMAL      = 0,
   RANDOM      = 1,
   SEQUENTIAL  = 2,
@@ -236,7 +331,7 @@ S.MADV = setmetatable({
 }, stringflag)
 
 -- posix fadvise
-S.POSIX_FADV = setmetatable({
+c.POSIX_FADV = setmetatable({
   NORMAL       = 0,
   RANDOM       = 1,
   SEQUENTIAL   = 2,
@@ -246,40 +341,40 @@ S.POSIX_FADV = setmetatable({
 }, stringflag)
 
 -- fallocate
-S.FALLOC_FL = setmetatable({
+c.FALLOC_FL = setmetatable({
   KEEP_SIZE  = 0x01,
   PUNCH_HOLE = 0x02,
 }, stringflag)
 
 -- getpriority, setpriority flags
-S.PRIO = setmetatable({
+c.PRIO = setmetatable({
   PROCESS = 0,
   PGRP = 1,
   USER = 2,
 }, stringflag)
 
 -- lseek
-S.SEEK = setmetatable({
+c.SEEK = setmetatable({
   SET = 0,
   CUR = 1,
   END = 2,
 }, stringflag)
 
 -- exit
-S.EXIT = setmetatable({
+c.EXIT = setmetatable({
   SUCCESS = 0,
   FAILURE = 1,
 }, stringflag)
 
 -- sigaction, note renamed SIGACT from SIG
-S.SIGACT = setmetatable({
+c.SIGACT = setmetatable({
   ERR = -1,
   DFL =  0,
   IGN =  1,
   HOLD = 2,
 }, stringflag)
 
-S.SIG = setmetatable({
+c.SIG = setmetatable({
   HUP = 1,
   INT = 2,
   QUIT = 3,
@@ -314,46 +409,50 @@ S.SIG = setmetatable({
 }, stringflag)
 
 local signals = {}
-for k, v in pairs(S.SIG) do signals[v] = k end
+for k, v in pairs(c.SIG) do signals[v] = k end
 
-S.SIG.IOT = 6
-S.SIG.UNUSED     = 31
-S.SIG.CLD        = S.SIG.CHLD
-S.SIG.POLL       = S.SIG.IO
+c.SIG.IOT = 6
+c.SIG.UNUSED     = 31
+c.SIG.CLD        = c.SIG.CHLD
+c.SIG.POLL       = c.SIG.IO
 
-S.NSIG          = 65
+c.NSIG          = 65 -- TODO not sure we need
 
 -- sigprocmask note renaming of SIG to SIGPM
-S.SIGPM = setmetatable({
+c.SIGPM = setmetatable({
   BLOCK     = 0,
   UNBLOCK   = 1,
   SETMASK   = 2,
 }, stringflag)
 
 -- signalfd
-S.SFD_CLOEXEC  = octal('02000000')
-S.SFD_NONBLOCK = octal('04000')
+c.SFD = setmetatable({
+  CLOEXEC  = octal('02000000'),
+  NONBLOCK = octal('04000'),
+}, multiflags)
 
--- sockets note mix of single and multiple flags
-S.SOCK_STREAM    = 1
-S.SOCK_DGRAM     = 2
-S.SOCK_RAW       = 3
-S.SOCK_RDM       = 4
-S.SOCK_SEQPACKET = 5
-S.SOCK_DCCP      = 6
-S.SOCK_PACKET    = 10
+-- sockets note mix of single and multiple flags TODO code to handle temporarily using multi which is kind of ok
+c.SOCK = setmetatable({
+  STREAM    = 1,
+  DGRAM     = 2,
+  RAW       = 3,
+  RDM       = 4,
+  SEQPACKET = 5,
+  DCCP      = 6,
+  PACKET    = 10,
 
-S.SOCK_CLOEXEC  = octal('02000000')
-S.SOCK_NONBLOCK = octal('04000')
+  CLOEXEC  = octal('02000000'),
+  NONBLOCK = octal('04000'),
+}, multiflags)
 
 -- misc socket constants
-S.SCM = setmetatable({
+c.SCM = setmetatable({
   RIGHTS = 0x01,
   CREDENTIALS = 0x02,
 }, stringflag)
 
 -- setsockopt
-S.SOL = setmetatable({
+c.SOL = setmetatable({
   SOCKET     = 1,
   RAW        = 255,
   DECNET     = 261,
@@ -364,7 +463,7 @@ S.SOL = setmetatable({
   IRDA       = 266,
 }, stringflag)
 
-S.SO = setmetatable({
+c.SO = setmetatable({
   DEBUG       = 1,
   REUSEADDR   = 2,
   TYPE        = 3,
@@ -384,47 +483,47 @@ S.SO = setmetatable({
 }, stringflag)
 if arch.socketoptions then arch.socketoptions(S)
 else
-  S.SO.PASSCRED    = 16
-  S.SO.PEERCRED    = 17
-  S.SO.RCVLOWAT    = 18
-  S.SO.SNDLOWAT    = 19
-  S.SO.RCVTIMEO    = 20
-  S.SO.SNDTIMEO    = 21
+  c.SO.PASSCRED    = 16
+  c.SO.PEERCRED    = 17
+  c.SO.RCVLOWAT    = 18
+  c.SO.SNDLOWAT    = 19
+  c.SO.RCVTIMEO    = 20
+  c.SO.SNDTIMEO    = 21
 end
 
 -- Maximum queue length specifiable by listen.
-S.SOMAXCONN = 128
+c.SOMAXCONN = 128
 
 -- shutdown
-S.SHUT = setmetatable({
+c.SHUT = setmetatable({
   RD   = 0,
   WR   = 1,
   RDWR = 2,
 }, stringflag)
 
 -- waitpid 3rd arg
-S.WNOHANG       = 1
-S.WUNTRACED     = 2
+c.W = setmetatable({
+  NOHANG       = 1,
+  UNTRACED     = 2,
+  EXITED       = 4,
+  CONTINUED    = 8,
+  NOWAIT       = 0x01000000,
+  NOTHREAD     = 0x20000000, -- __WNOTHREAD
+  ALL          = 0x40000000, -- __WALL
+  CLONE        = 0x80000000, -- __WCLONE
+}, multiflags)
+
+c.W.STOPPED      = c.W.UNTRACED
 
 -- waitid
-S.P = setmetatable({
+c.P = setmetatable({
   ALL  = 0,
   PID  = 1,
   PGID = 2,
 }, stringflag)
 
-S.WSTOPPED      = 2
-S.WEXITED       = 4
-S.WCONTINUED    = 8
-S.WNOWAIT       = 0x01000000
-
-S.__WNOTHREAD    = 0x20000000
-S.__WALL         = 0x40000000
-S.__WCLONE       = 0x80000000
-S.NOTHREAD, S.WALL, S.WCLONE = S.__WNOTHREAD, S.__WALL, S.__WCLONE
-
 -- struct siginfo, eg waitid
-S.SI = setmetatable({
+c.SI = setmetatable({
   ASYNCNL = -60,
   TKILL = -6,
   SIGIO = -5,
@@ -436,7 +535,9 @@ S.SI = setmetatable({
   KERNEL = 0x80,
 }, stringflag)
 
-S.ILL = setmetatable({
+-- note renamed ILL to SIGILL etc as POLL clashes
+
+c.SIGILL = setmetatable({
   ILLOPC = 1,
   ILLOPN = 2,
   ILLADR = 3,
@@ -447,7 +548,7 @@ S.ILL = setmetatable({
   BADSTK = 8,
 }, stringflag)
 
-S.FPE = setmetatable({
+c.SIGFPE = setmetatable({
   INTDIV = 1,
   INTOVF = 2,
   FLTDIV = 3,
@@ -458,23 +559,23 @@ S.FPE = setmetatable({
   FLTSUB = 8,
 }, stringflag)
 
-S.SEGV = setmetatable({
+c.SIGSEGV = setmetatable({
   MAPERR = 1,
   ACCERR = 2,
 }, stringflag)
 
-S.BUS = setmetatable({
+c.SIGBUS = setmetatable({
   ADRALN = 1,
   ADRERR = 2,
   OBJERR = 3,
 }, stringflag)
 
-S.TRAP = setmetatable({
+c.SIGTRAP = setmetatable({
   BRKPT = 1,
   TRACE = 2,
 }, stringflag)
 
-S.CLD = setmetatable({
+c.SIGCLD = setmetatable({
   EXITED    = 1,
   KILLED    = 2,
   DUMPED    = 3,
@@ -483,7 +584,7 @@ S.CLD = setmetatable({
   CONTINUED = 6,
 }, stringflag)
 
-S.POLL = setmetatable({
+c.SIGPOLL = setmetatable({
   IN  = 1,
   OUT = 2,
   MSG = 3,
@@ -493,26 +594,29 @@ S.POLL = setmetatable({
 }, stringflag)
 
 -- sigaction
-S.SA_NOCLDSTOP = 0x00000001
-S.SA_NOCLDWAIT = 0x00000002
-S.SA_SIGINFO   = 0x00000004
-S.SA_ONSTACK   = 0x08000000
-S.SA_RESTART   = 0x10000000
-S.SA_NODEFER   = 0x40000000
-S.SA_RESETHAND = 0x80000000
-S.SA_NOMASK    = S.SA_NODEFER
-S.SA_ONESHOT   = S.SA_RESETHAND
-S.SA_RESTORER  = 0x04000000
+c.SA = setmetatable({
+  NOCLDSTOP = 0x00000001,
+  NOCLDWAIT = 0x00000002,
+  SIGINFO   = 0x00000004,
+  ONSTACK   = 0x08000000,
+  RESTART   = 0x10000000,
+  NODEFER   = 0x40000000,
+  RESETHAND = 0x80000000,
+  RESTORER  = 0x04000000,
+}, multiflags)
+
+c.SA.NOMASK    = c.SA.NODEFER
+c.SA.ONESHOT   = c.SA.RESETHAND
 
 -- timers
-S.ITIMER = setmetatable({
+c.ITIMER = setmetatable({
   REAL    = 0,
   VIRTUAL = 1,
   PROF    = 2,
 }, stringflag)
 
 -- clocks
-S.CLOCK = setmetatable({
+c.CLOCK = setmetatable({
   REALTIME           = 0,
   MONOTONIC          = 1,
   PROCESS_CPUTIME_ID = 2,
@@ -522,43 +626,47 @@ S.CLOCK = setmetatable({
   MONOTONIC_COARSE   = 6,
 }, stringflag)
 
-S.TIMER = setmetatable({
+c.TIMER = setmetatable({
   ABSTIME = 1,
 }, stringflag)
 
 -- adjtimex
-S.ADJ_OFFSET             = 0x0001
-S.ADJ_FREQUENCY          = 0x0002
-S.ADJ_MAXERROR           = 0x0004
-S.ADJ_ESTERROR           = 0x0008
-S.ADJ_STATUS             = 0x0010
-S.ADJ_TIMECONST          = 0x0020
-S.ADJ_TAI                = 0x0080
-S.ADJ_MICRO              = 0x1000
-S.ADJ_NANO               = 0x2000
-S.ADJ_TICK               = 0x4000
-S.ADJ_OFFSET_SINGLESHOT  = 0x8001
-S.ADJ_OFFSET_SS_READ     = 0xa001
+c.ADJ = setmetatable({
+  OFFSET             = 0x0001,
+  FREQUENCY          = 0x0002,
+  MAXERROR           = 0x0004,
+  ESTERROR           = 0x0008,
+  STATUS             = 0x0010,
+  TIMECONST          = 0x0020,
+  TAI                = 0x0080,
+  MICRO              = 0x1000,
+  NANO               = 0x2000,
+  TICK               = 0x4000,
+  OFFSET_SINGLESHOT  = 0x8001,
+  OFFSET_SS_READ     = 0xa001,
+}, multiflags)
 
-S.STA_PLL         = 0x0001
-S.STA_PPSFREQ     = 0x0002
-S.STA_PPSTIME     = 0x0004
-S.STA_FLL         = 0x0008
-S.STA_INS         = 0x0010
-S.STA_DEL         = 0x0020
-S.STA_UNSYNC      = 0x0040
-S.STA_FREQHOLD    = 0x0080
-S.STA_PPSSIGNAL   = 0x0100
-S.STA_PPSJITTER   = 0x0200
-S.STA_PPSWANDER   = 0x0400
-S.STA_PPSERROR    = 0x0800
-S.STA_CLOCKERR    = 0x1000
-S.STA_NANO        = 0x2000
-S.STA_MODE        = 0x4000
-S.STA_CLK         = 0x8000
+c.STA = setmetatable({
+  PLL         = 0x0001,
+  PPSFREQ     = 0x0002,
+  PPSTIME     = 0x0004,
+  FLL         = 0x0008,
+  INS         = 0x0010,
+  DEL         = 0x0020,
+  UNSYNC      = 0x0040,
+  FREQHOLD    = 0x0080,
+  PPSSIGNAL   = 0x0100,
+  PPSJITTER   = 0x0200,
+  PPSWANDER   = 0x0400,
+  PPSERROR    = 0x0800,
+  CLOCKERR    = 0x1000,
+  NANO        = 0x2000,
+  MODE        = 0x4000,
+  CLK         = 0x8000,
+}, multiflags)
 
 -- return values for adjtimex
-S.TIME = setmetatable({
+c.TIME = setmetatable({
   OK         = 0,
   INS        = 1,
   DEL        = 2,
@@ -567,51 +675,73 @@ S.TIME = setmetatable({
   ERROR      = 5,
 }, stringflag)
 
-S.TIME.BAD        = S.TIME.ERROR
+c.TIME.BAD        = c.TIME.ERROR
 
 -- xattr
-S.XATTR = setmetatable({
+c.XATTR = setmetatable({
   CREATE  = 1,
   REPLACE = 2,
 }, stringflag)
 
 -- utime
-S.UTIME = setmetatable({
+c.UTIME = setmetatable({
   NOW  = bit.lshift(1, 30) - 1,
   OMIT = bit.lshift(1, 30) - 2,
 }, stringflag)
 
--- ...at commands
-S.AT_FDCWD = -100
-S.AT_SYMLINK_NOFOLLOW    = 0x100
-S.AT_REMOVEDIR           = 0x200
-S.AT_SYMLINK_FOLLOW      = 0x400
-S.AT_NO_AUTOMOUNT        = 0x800
-S.AT_EACCESS             = 0x200
+-- ...at commands note these are valid in different combinations so different tables provided
+c.AT_FDCWD = setmetatable({
+  FDCWD = -100,
+}, stringflag)
+
+c.AT_REMOVEDIR = setmetatable({
+  REMOVEDIR = 0x200,
+}, multiflags)
+
+c.AT_SYMLINK_FOLLOW = setmetatable({
+  SYMLINK_FOLLOW = 0x400,
+}, multiflags)
+
+c.AT_SYMLINK_NOFOLLOW = setmetatable({
+  SYMLINK_NOFOLLOW = 0x100,
+}, multiflags)
+
+c.AT_ACCESSAT = setmetatable({
+  SYMLINK_NOFOLLOW = 0x100,
+  AT_EACCESS       = 0x200,
+}, multiflags)
+
+c.AT_FSTATAT = setmetatable({
+  SYMLINK_NOFOLLOW = 0x100,
+  NO_AUTOMOUNT     = 0x800,
+}, multiflags)
 
 -- send, recv etc
-S.MSG_OOB             = 0x01
-S.MSG_PEEK            = 0x02
-S.MSG_DONTROUTE       = 0x04
-S.MSG_TRYHARD         = S.MSG_DONTROUTE
-S.MSG_CTRUNC          = 0x08
-S.MSG_PROXY           = 0x10
-S.MSG_TRUNC           = 0x20
-S.MSG_DONTWAIT        = 0x40
-S.MSG_EOR             = 0x80
-S.MSG_WAITALL         = 0x100
-S.MSG_FIN             = 0x200
-S.MSG_SYN             = 0x400
-S.MSG_CONFIRM         = 0x800
-S.MSG_RST             = 0x1000
-S.MSG_ERRQUEUE        = 0x2000
-S.MSG_NOSIGNAL        = 0x4000
-S.MSG_MORE            = 0x8000
-S.MSG_WAITFORONE      = 0x10000
-S.MSG_CMSG_CLOEXEC    = 0x40000000
+c.MSG = setmetatable({
+  OOB             = 0x01,
+  PEEK            = 0x02,
+  DONTROUTE       = 0x04,
+  CTRUNC          = 0x08,
+  PROXY           = 0x10,
+  TRUNC           = 0x20,
+  DONTWAIT        = 0x40,
+  EOR             = 0x80,
+  WAITALL         = 0x100,
+  FIN             = 0x200,
+  SYN             = 0x400,
+  CONFIRM         = 0x800,
+  RST             = 0x1000,
+  ERRQUEUE        = 0x2000,
+  NOSIGNAL        = 0x4000,
+  MORE            = 0x8000,
+  WAITFORONE      = 0x10000,
+  CMSG_CLOEXEC    = 0x40000000,
+}, multiflags)
+
+c.MSG.TRYHARD         = c.MSG.DONTROUTE
 
 -- rlimit
-S.RLIMIT = setmetatable({
+c.RLIMIT = setmetatable({
   CPU        = 0,
   FSIZE      = 1,
   DATA       = 2,
@@ -630,63 +760,73 @@ S.RLIMIT = setmetatable({
   RTTIME     = 15,
 }, stringflag)
 
-S.RLIMIT.OFILE = S.RLIMIT.NOFILE
+c.RLIMIT.OFILE = c.RLIMIT.NOFILE
 
 -- timerfd
-S.TFD_CLOEXEC = octal("02000000")
-S.TFD_NONBLOCK = octal("04000")
+c.TFD = setmetatable({
+  CLOEXEC = octal("02000000"),
+  NONBLOCK = octal("04000"),
+}, multiflags)
 
-S.TFD_TIMER = setmetatable({
+c.TFD_TIMER = setmetatable({
   ABSTIME = 1,
 }, stringflag)
 
 -- poll
-S.POLLIN          = 0x001
-S.POLLPRI         = 0x002
-S.POLLOUT         = 0x004
-S.POLLRDNORM      = 0x040
-S.POLLRDBAND      = 0x080
-S.POLLWRNORM      = 0x100
-S.POLLWRBAND      = 0x200
-S.POLLMSG         = 0x400
-S.POLLREMOVE      = 0x1000
-S.POLLRDHUP       = 0x2000
-S.POLLERR         = 0x008
-S.POLLHUP         = 0x010
-S.POLLNVAL        = 0x020
+c.POLL = setmetatable({
+  IN          = 0x001,
+  PRI         = 0x002,
+  OUT         = 0x004,
+  ERR         = 0x008,
+  HUP         = 0x010,
+  NVAL        = 0x020,
+  RDNORM      = 0x040,
+  RDBAND      = 0x080,
+  WRNORM      = 0x100,
+  WRBAND      = 0x200,
+  MSG         = 0x400,
+  REMOVE      = 0x1000,
+  RDHUP       = 0x2000,
+}, multiflags)
 
--- epoll
-S.EPOLL_CLOEXEC = octal("02000000")
-S.EPOLL_NONBLOCK = octal("04000")
+-- epoll renamed from EPOLL_ to EPOLLCREATE
+c.EPOLLCREATE = setmetatable({
+  CLOEXEC = octal("02000000"),
+  NONBLOCK = octal("04000"),
+}, multiflags)
 
-S.EPOLLIN = 0x001
-S.EPOLLPRI = 0x002
-S.EPOLLOUT = 0x004
-S.EPOLLRDNORM = 0x040
-S.EPOLLRDBAND = 0x080
-S.EPOLLWRNORM = 0x100
-S.EPOLLWRBAND = 0x200
-S.EPOLLMSG = 0x400
-S.EPOLLERR = 0x008
-S.EPOLLHUP = 0x010
-S.EPOLLRDHUP = 0x2000
-S.EPOLLONESHOT = bit.lshift(1, 30)
-S.EPOLLET = bit.lshift(1, 30) * 2 -- 2^31 but making sure no sign issue 
+c.EPOLL = setmetatable({
+  IN  = 0x001,
+  PRI = 0x002,
+  OUT = 0x004,
+  RDNORM = 0x040,
+  RDBAND = 0x080,
+  WRNORM = 0x100,
+  WRBAND = 0x200,
+  MSG = 0x400,
+  ERR = 0x008,
+  HUP = 0x010,
+  RDHUP = 0x2000,
+  ONESHOT = bit.lshift(1, 30),
+  ET = bit.lshift(1, 30) * 2, -- 2^31 but making sure no sign issue 
+}, multiflags)
 
-S.EPOLL_CTL = setmetatable({
+c.EPOLL_CTL = setmetatable({
   ADD = 1,
   DEL = 2,
   MOD = 3,
 }, stringflag)
 
 -- splice etc
-S.SPLICE_F_MOVE         = 1
-S.SPLICE_F_NONBLOCK     = 2
-S.SPLICE_F_MORE         = 4
-S.SPLICE_F_GIFT         = 8
+c.SPLICE_F = setmetatable({
+  MOVE         = 1,
+  NONBLOCK     = 2,
+  MORE         = 4,
+  GIFT         = 8,
+}, multiflags)
 
 -- aio - see /usr/include/linux/aio_abi.h
-S.IOCB_CMD = setmetatable({
+c.IOCB_CMD = setmetatable({
   PREAD   = 0,
   PWRITE  = 1,
   FSYNC   = 2,
@@ -698,10 +838,10 @@ S.IOCB_CMD = setmetatable({
   PWRITEV = 8,
 }, stringflag)
 
-S.IOCB_FLAG_RESFD = 1
+c.IOCB_FLAG_RESFD = 1
 
 -- file types in directory
-S.DT = setmetatable({
+c.DT = setmetatable({
   UNKNOWN = 0,
   FIFO = 1,
   CHR = 2,
@@ -714,12 +854,14 @@ S.DT = setmetatable({
 }, stringflag)
 
 -- sync file range
-S.SYNC_FILE_RANGE_WAIT_BEFORE = 1
-S.SYNC_FILE_RANGE_WRITE       = 2
-S.SYNC_FILE_RANGE_WAIT_AFTER  = 4
+c.SYNC_FILE_RANGE = setmetatable({
+  WAIT_BEFORE = 1,
+  WRITE       = 2,
+  WAIT_AFTER  = 4,
+}, multiflags)
 
 -- netlink
-S.NETLINK = setmetatable({
+c.NETLINK = setmetatable({
   ROUTE         = 0,
   UNUSED        = 1,
   USERSOCK      = 2,
@@ -741,23 +883,39 @@ S.NETLINK = setmetatable({
   ECRYPTFS      = 19,
 }, stringflag)
 
-S.NLM_F_REQUEST = 1
-S.NLM_F_MULTI   = 2
-S.NLM_F_ACK     = 4
-S.NLM_F_ECHO    = 8
+-- see man netlink(7) for details. NLM_F_ is generic, actually use NLMSG_GET, NLMSG_NEW. TODO cleanup usage.
+c.NLM_F = setmetatable({
+  REQUEST = 1,
+  MULTI   = 2,
+  ACK     = 4,
+  ECHO    = 8,
+}, multiflags)
 
-S.NLM_F_ROOT    = 0x100
-S.NLM_F_MATCH   = 0x200
-S.NLM_F_ATOMIC  = 0x400
-S.NLM_F_DUMP    = bit.bor(S.NLM_F_ROOT, S.NLM_F_MATCH)
+c.NLMSG_GETLINK = setmetatable({
+  REQUEST = 1,
+  MULTI   = 2,
+  ACK     = 4,
+  ECHO    = 8,
+  ROOT    = 0x100,
+  MATCH   = 0x200,
+  ATOMIC  = 0x400,
+}, multiflags)
 
-S.NLM_F_REPLACE = 0x100
-S.NLM_F_EXCL    = 0x200
-S.NLM_F_CREATE  = 0x400
-S.NLM_F_APPEND  = 0x800
+c.NLMSG_GETLINK.DUMP = bit.bor(c.NLMSG_GETLINK.ROOT, c.NLMSG_GETLINK.MATCH)
+
+c.NLMSG_NEWLINK = setmetatable({
+  REQUEST = 1,
+  MULTI   = 2,
+  ACK     = 4,
+  ECHO    = 8,
+  REPLACE = 0x100,
+  EXCL    = 0x200,
+  CREATE  = 0x400,
+  APPEND  = 0x800,
+}, multiflags)
 
 -- generic types. These are part of same sequence as RTM
-S.NLMSG = setmetatable({
+c.NLMSG = setmetatable({
   NOOP     = 0x1,
   ERROR    = 0x2,
   DONE     = 0x3,
@@ -765,7 +923,7 @@ S.NLMSG = setmetatable({
 }, stringflag)
 
 -- routing
-S.RTM = setmetatable({
+c.RTM = setmetatable({
   NEWLINK     = 16,
   DELLINK     = 17,
   GETLINK     = 18,
@@ -808,8 +966,8 @@ S.RTM = setmetatable({
   SETDCB = 79,
 }, stringflag)
 
--- linux/if_link.h
-S.IFLA = setmetatable({
+-- linux/if_linc.h
+c.IFLA = setmetatable({
   UNSPEC    = 0,
   ADDRESS   = 1,
   BROADCAST = 2,
@@ -841,12 +999,12 @@ S.IFLA = setmetatable({
   NET_NS_FD = 28,
 }, stringflag)
 
-S.IFLA_INET = setmetatable({
+c.IFLA_INET = setmetatable({
   UNSPEC = 0,
   CONF   = 1,
 }, stringflag)
 
-S.IFLA_INET6 = setmetatable({
+c.IFLA_INET6 = setmetatable({
   UNSPEC = 0,
   FLAGS  = 1,
   CONF   = 2,
@@ -856,14 +1014,14 @@ S.IFLA_INET6 = setmetatable({
   ICMP6STATS = 6,
 }, stringflag)
 
-S.IFLA_INFO = setmetatable({
+c.IFLA_INFO = setmetatable({
   UNSPEC = 0,
   KIND   = 1,
   DATA   = 2,
   XSTATS = 3,
 }, stringflag)
 
-S.IFLA_VLAN = setmetatable({
+c.IFLA_VLAN = setmetatable({
   UNSPEC = 0,
   ID     = 1,
   FLAGS  = 2,
@@ -871,25 +1029,29 @@ S.IFLA_VLAN = setmetatable({
   INGRESS_QOS = 4,
 }, stringflag)
 
-S.IFLA_VLAN_QOS = setmetatable({
+c.IFLA_VLAN_QOS = setmetatable({
   UNSPEC  = 0,
   MAPPING = 1,
 }, stringflag)
 
-S.IFLA_MACVLAN = setmetatable({
+c.IFLA_MACVLAN = setmetatable({
   UNSPEC = 0,
   MODE   = 1,
 }, stringflag)
 
-S.MACVLAN_MODE_PRIVATE = 1
-S.MACVLAN_MODE_VEPA    = 2
-S.MACVLAN_MODE_BRIDGE  = 4
-S.MACVLAN_MODE_PASSTHRU = 8
+c.MACVLAN_MODE = setmetatable({
+  PRIVATE = 1,
+  VEPA    = 2,
+  BRIDGE  = 4,
+  PASSTHRU = 8,
+}, multiflags)
 
-S.IFLA_VF_INFO_UNSPEC = 0
-S.IFLA_VF_INFO        = 1 -- TODO may have to rename IFLA_VF_INFO_INFO?
+c.IFLA_VF_INFO = setmetatable({
+  UNSPEC = 0,
+  INFO   = 1, -- note renamed IFLA_VF_INFO to IFLA_VF_INFO.INFO
+}, stringflag)
 
-S.IFLA_VF = setmetatable({
+c.IFLA_VF = setmetatable({
   UNSPEC   = 0,
   MAC      = 1,
   VLAN     = 2,
@@ -897,10 +1059,12 @@ S.IFLA_VF = setmetatable({
   SPOOFCHK = 4,
 }, stringflag)
 
-S.IFLA_VF_PORT_UNSPEC = 0
-S.IFLA_VF_PORT        = 1 -- TODO may have to rename IFLA_VF_PORT_PORT?
+c.IFLA_VF_PORT = setmetatable({
+  UNSPEC = 0,
+  PORT   = 1, -- note renamed from IFLA_VF_PORT to IFLA_VF_PORT.PORT?
+}, stringflag)
 
-S.IFLA_PORT = setmetatable({
+c.IFLA_PORT = setmetatable({
   UNSPEC    = 0,
   VF        = 1,
   PROFILE   = 2,
@@ -911,36 +1075,45 @@ S.IFLA_PORT = setmetatable({
   RESPONSE  = 7,
 }, stringflag)
 
-S.VETH_INFO = setmetatable({
+c.VETH_INFO = setmetatable({
   UNSPEC = 0,
   PEER   = 1,
 }, stringflag)
 
-S.PORT_PROFILE_MAX      =  40
-S.PORT_UUID_MAX         =  16
-S.PORT_SELF_VF          =  -1
+c.PORT = setmetatable({
+  PROFILE_MAX      =  40,
+  UUID_MAX         =  16,
+  SELF_VF          =  -1,
+}, stringflag)
 
-S.PORT_REQUEST_PREASSOCIATE    = 0
-S.PORT_REQUEST_PREASSOCIATE_RR = 1
-S.PORT_REQUEST_ASSOCIATE       = 2
-S.PORT_REQUEST_DISASSOCIATE    = 3
+c.PORT_REQUEST = setmetatable({
+  PREASSOCIATE    = 0,
+  PREASSOCIATE_RR = 1,
+  ASSOCIATE       = 2,
+  DISASSOCIATE    = 3,
+}, stringflag)
 
-S.PORT_VDP_RESPONSE_SUCCESS = 0
-S.PORT_VDP_RESPONSE_INVALID_FORMAT = 1
-S.PORT_VDP_RESPONSE_INSUFFICIENT_RESOURCES = 2
-S.PORT_VDP_RESPONSE_UNUSED_VTID = 3
-S.PORT_VDP_RESPONSE_VTID_VIOLATION = 4
-S.PORT_VDP_RESPONSE_VTID_VERSION_VIOALTION = 5
-S.PORT_VDP_RESPONSE_OUT_OF_SYNC = 6
-S.PORT_PROFILE_RESPONSE_SUCCESS = 0x100
-S.PORT_PROFILE_RESPONSE_INPROGRESS = 0x101
-S.PORT_PROFILE_RESPONSE_INVALID = 0x102
-S.PORT_PROFILE_RESPONSE_BADSTATE = 0x103
-S.PORT_PROFILE_RESPONSE_INSUFFICIENT_RESOURCES = 0x104
-S.PORT_PROFILE_RESPONSE_ERROR = 0x105
+c.PORT_VDP_RESPONSE = setmetatable({
+  SUCCESS = 0,
+  INVALID_FORMAT = 1,
+  INSUFFICIENT_RESOURCES = 2,
+  UNUSED_VTID = 3,
+  VTID_VIOLATION = 4,
+  VTID_VERSION_VIOALTION = 5, -- seems to be misspelled in headers
+  OUT_OF_SYNC = 6,
+}, stringflag)
+
+c.PORT_PROFILE_RESPONSE = setmetatable({
+  SUCCESS = 0x100,
+  INPROGRESS = 0x101,
+  INVALID = 0x102,
+  BADSTATE = 0x103,
+  INSUFFICIENT_RESOURCES = 0x104,
+  RESPONSE_ERROR = 0x105,
+}, stringflag)
 
 -- from if_addr.h interface address types and flags
-S.IFA = setmetatable({
+c.IFA = setmetatable({
   UNSPEC    = 0,
   ADDRESS   = 1,
   LOCAL     = 2,
@@ -951,19 +1124,21 @@ S.IFA = setmetatable({
   MULTICAST = 7,
 }, stringflag)
 
-S.IFA_F_SECONDARY   = 0x01
-S.IFA_F_TEMPORARY   = S.IFA_F_SECONDARY
+c.IFA_F = setmetatable({
+  SECONDARY   = 0x01,
+  NODAD       = 0x02,
+  OPTIMISTIC  = 0x04,
+  DADFAILED   = 0x08,
+  HOMEADDRESS = 0x10,
+  DEPRECATED  = 0x20,
+  TENTATIVE   = 0x40,
+  PERMANENT   = 0x80,
+}, multiflags)
 
-S.IFA_F_NODAD       = 0x02
-S.IFA_F_OPTIMISTIC  = 0x04
-S.IFA_F_DADFAILED   = 0x08
-S.IFA_F_HOMEADDRESS = 0x10
-S.IFA_F_DEPRECATED  = 0x20
-S.IFA_F_TENTATIVE   = 0x40
-S.IFA_F_PERMANENT   = 0x80
+c.IFA_F.TEMPORARY   = c.IFA_F.SECONDARY
 
 -- routing
-S.RTN = setmetatable({
+c.RTN = setmetatable({
   UNSPEC      = 0,
   UNICAST     = 1,
   LOCAL       = 2,
@@ -978,7 +1153,7 @@ S.RTN = setmetatable({
   XRESOLVE    = 11,
 }, stringflag)
 
-S.RTPROT = setmetatable({
+c.RTPROT = setmetatable({
   UNSPEC   = 0,
   REDIRECT = 1,
   KERNEL   = 2,
@@ -995,7 +1170,7 @@ S.RTPROT = setmetatable({
   DHCP     = 16,
 }, stringflag)
 
-S.RT_SCOPE = setmetatable({
+c.RT_SCOPE = setmetatable({
   UNIVERSE = 0,
   SITE = 200,
   LINK = 253,
@@ -1003,12 +1178,14 @@ S.RT_SCOPE = setmetatable({
   NOWHERE = 255,
 }, stringflag)
 
-S.RTM_F_NOTIFY          = 0x100
-S.RTM_F_CLONED          = 0x200
-S.RTM_F_EQUALIZE        = 0x400
-S.RTM_F_PREFIX          = 0x800
+c.RTM_F = setmetatable({
+  NOTIFY          = 0x100,
+  CLONED          = 0x200,
+  EQUALIZE        = 0x400,
+  PREFIX          = 0x800,
+}, multiflags)
 
-S.RT_TABLE = setmetatable({
+c.RT_TABLE = setmetatable({
   UNSPEC  = 0,
   COMPAT  = 252,
   DEFAULT = 253,
@@ -1017,7 +1194,7 @@ S.RT_TABLE = setmetatable({
   MAX     = 0xFFFFFFFF,
 }, stringflag)
 
-S.RTA = setmetatable({
+c.RTA = setmetatable({
   UNSPEC = 0,
   DST = 1,
   SRC = 2,
@@ -1038,121 +1215,133 @@ S.RTA = setmetatable({
 }, stringflag)
 
 -- route flags
-S.RTF_UP          = 0x0001
-S.RTF_GATEWAY     = 0x0002
-S.RTF_HOST        = 0x0004
-S.RTF_REINSTATE   = 0x0008
-S.RTF_DYNAMIC     = 0x0010
-S.RTF_MODIFIED    = 0x0020
-S.RTF_MTU         = 0x0040
-S.RTF_MSS         = S.RTF_MTU
-S.RTF_WINDOW      = 0x0080
-S.RTF_IRTT        = 0x0100
-S.RTF_REJECT      = 0x0200
+c.RTF = setmetatable({
+  UP          = 0x0001,
+  GATEWAY     = 0x0002,
+  HOST        = 0x0004,
+  REINSTATE   = 0x0008,
+  DYNAMIC     = 0x0010,
+  MODIFIED    = 0x0020,
+  MTU         = 0x0040,
+  WINDOW      = 0x0080,
+  IRTT        = 0x0100,
+  REJECT      = 0x0200,
 
 -- ipv6 route flags
-S.RTF_DEFAULT     = 0x00010000
-S.RTF_ALLONLINK   = 0x00020000
-S.RTF_ADDRCONF    = 0x00040000
-S.RTF_PREFIX_RT   = 0x00080000
-S.RTF_ANYCAST     = 0x00100000
-S.RTF_NONEXTHOP   = 0x00200000
-S.RTF_EXPIRES     = 0x00400000
-S.RTF_ROUTEINFO   = 0x00800000
-S.RTF_CACHE       = 0x01000000
-S.RTF_FLOW        = 0x02000000
-S.RTF_POLICY      = 0x04000000
+  DEFAULT     = 0x00010000,
+  ALLONLINK   = 0x00020000,
+  ADDRCONF    = 0x00040000,
+  PREFIX_RT   = 0x00080000,
+  ANYCAST     = 0x00100000,
+  NONEXTHOP   = 0x00200000,
+  EXPIRES     = 0x00400000,
+  ROUTEINFO   = 0x00800000,
+  CACHE       = 0x01000000,
+  FLOW        = 0x02000000,
+  POLICY      = 0x04000000,
+  LOCAL       = 0x80000000,
+}, multiflags)
+
+c.RTF.MSS         = c.RTF.MTU
+
 --#define RTF_PREF(pref)  ((pref) << 27)
 --#define RTF_PREF_MASK   0x18000000
-S.RTF_LOCAL       = 0x80000000
 
 -- interface flags
-S.IFF_UP         = 0x1
-S.IFF_BROADCAST  = 0x2
-S.IFF_DEBUG      = 0x4
-S.IFF_LOOPBACK   = 0x8
-S.IFF_POINTOPOINT= 0x10
-S.IFF_NOTRAILERS = 0x20
-S.IFF_RUNNING    = 0x40
-S.IFF_NOARP      = 0x80
-S.IFF_PROMISC    = 0x100
-S.IFF_ALLMULTI   = 0x200
-S.IFF_MASTER     = 0x400
-S.IFF_SLAVE      = 0x800
-S.IFF_MULTICAST  = 0x1000
-S.IFF_PORTSEL    = 0x2000
-S.IFF_AUTOMEDIA  = 0x4000
-S.IFF_DYNAMIC    = 0x8000
-S.IFF_LOWER_UP   = 0x10000
-S.IFF_DORMANT    = 0x20000
-S.IFF_ECHO       = 0x40000
+c.IFF = setmetatable({
+  UP         = 0x1,
+  BROADCAST  = 0x2,
+  DEBUG      = 0x4,
+  LOOPBACK   = 0x8,
+  POINTOPOINT= 0x10,
+  NOTRAILERS = 0x20,
+  RUNNING    = 0x40,
+  NOARP      = 0x80,
+  PROMISC    = 0x100,
+  ALLMULTI   = 0x200,
+  MASTER     = 0x400,
+  SLAVE      = 0x800,
+  MULTICAST  = 0x1000,
+  PORTSEL    = 0x2000,
+  AUTOMEDIA  = 0x4000,
+  DYNAMIC    = 0x8000,
+  LOWER_UP   = 0x10000,
+  DORMANT    = 0x20000,
+  ECHO       = 0x40000,
+}, multiflags)
 
-S.IFF_ALL        = 0xffffffff
-S.IFF_NONE       = bit.bnot(0x7ffff) -- this is a bit of a fudge as zero should work, but does not for historical reasons see net/core/rtnetlink.c
+c.IFF.ALL        = 0xffffffff
+c.IFF.NONE       = bit.bnot(0x7ffff) -- this is a bit of a fudge as zero should work, but does not for historical reasons see net/core/rtnetlinc.c
 
--- not sure if we need these
-S.IFF_SLAVE_NEEDARP = 0x40
-S.IFF_ISATAP        = 0x80
-S.IFF_MASTER_ARPMON = 0x100
-S.IFF_WAN_HDLC      = 0x200
-S.IFF_XMIT_DST_RELEASE = 0x400
-S.IFF_DONT_BRIDGE   = 0x800
-S.IFF_DISABLE_NETPOLL    = 0x1000
-S.IFF_MACVLAN_PORT       = 0x2000
-S.IFF_BRIDGE_PORT = 0x4000
-S.IFF_OVS_DATAPATH       = 0x8000
-S.IFF_TX_SKB_SHARING     = 0x10000
-S.IFF_UNICAST_FLT = 0x20000
+c.IFF.VOLATILE = c.IFF.LOOPBACK + c.IFF.POINTOPOINT + c.IFF.BROADCAST + c.IFF.ECHO +
+                 c.IFF.MASTER + c.IFF.SLAVE + c.IFF.RUNNING + c.IFF.LOWER_UP + c.IFF.DORMANT
 
-S.IFF_VOLATILE = S.IFF_LOOPBACK + S.IFF_POINTOPOINT + S.IFF_BROADCAST + S.IFF_ECHO +
-                 S.IFF_MASTER + S.IFF_SLAVE + S.IFF_RUNNING + S.IFF_LOWER_UP + S.IFF_DORMANT
+-- not sure if we need these TODO another table as duplicated values
+--[[
+c.IFF_SLAVE_NEEDARP = 0x40
+c.IFF_ISATAP        = 0x80
+c.IFF_MASTER_ARPMON = 0x100
+c.IFF_WAN_HDLC      = 0x200
+c.IFF_XMIT_DST_RELEASE = 0x400
+c.IFF_DONT_BRIDGE   = 0x800
+c.IFF_DISABLE_NETPOLL    = 0x1000
+c.IFF_MACVLAN_PORT       = 0x2000
+c.IFF_BRIDGE_PORT = 0x4000
+c.IFF_OVS_DATAPATH       = 0x8000
+c.IFF_TX_SKB_SHARING     = 0x10000
+c.IFF_UNICAST_FLT = 0x20000
+]]
 
 -- netlink multicast groups
 -- legacy names, which are masks.
-S.RTMGRP_LINK            = 1
-S.RTMGRP_NOTIFY          = 2
-S.RTMGRP_NEIGH           = 4
-S.RTMGRP_TC              = 8
-S.RTMGRP_IPV4_IFADDR     = 0x10
-S.RTMGRP_IPV4_MROUTE     = 0x20
-S.RTMGRP_IPV4_ROUTE      = 0x40
-S.RTMGRP_IPV4_RULE       = 0x80
-S.RTMGRP_IPV6_IFADDR     = 0x100
-S.RTMGRP_IPV6_MROUTE     = 0x200
-S.RTMGRP_IPV6_ROUTE      = 0x400
-S.RTMGRP_IPV6_IFINFO     = 0x800
---S.RTMGRP_DECNET_IFADDR   = 0x1000
---S.RTMGRP_DECNET_ROUTE    = 0x4000
-S.RTMGRP_IPV6_PREFIX     = 0x20000
+c.RTMGRP = setmetatable({
+  LINK            = 1,
+  NOTIFY          = 2,
+  NEIGH           = 4,
+  TC              = 8,
+  IPV4_IFADDR     = 0x10,
+  IPV4_MROUTE     = 0x20,
+  IPV4_ROUTE      = 0x40,
+  IPV4_RULE       = 0x80,
+  IPV6_IFADDR     = 0x100,
+  IPV6_MROUTE     = 0x200,
+  IPV6_ROUTE      = 0x400,
+  IPV6_IFINFO     = 0x800,
+--DECNET_IFADDR   = 0x1000,
+--DECNET_ROUTE    = 0x4000,
+  IPV6_PREFIX     = 0x20000,
+}, multiflags)
 
 -- rtnetlink multicast groups (bit numbers not masks)
-S.RTNLGRP_NONE = 0
-S.RTNLGRP_LINK = 1
-S.RTNLGRP_NOTIFY = 2
-S.RTNLGRP_NEIGH = 3
-S.RTNLGRP_TC = 4
-S.RTNLGRP_IPV4_IFADDR = 5
-S.RTNLGRP_IPV4_MROUTE = 6
-S.RTNLGRP_IPV4_ROUTE = 7
-S.RTNLGRP_IPV4_RULE = 8
-S.RTNLGRP_IPV6_IFADDR = 9
-S.RTNLGRP_IPV6_MROUTE = 10
-S.RTNLGRP_IPV6_ROUTE = 11
-S.RTNLGRP_IPV6_IFINFO = 12
---S.RTNLGRP_DECNET_IFADDR = 13
-S.RTNLGRP_NOP2 = 14
---S.RTNLGRP_DECNET_ROUTE = 15
---S.RTNLGRP_DECNET_RULE = 16
-S.RTNLGRP_NOP4 = 17
-S.RTNLGRP_IPV6_PREFIX = 18
-S.RTNLGRP_IPV6_RULE = 19
-S.RTNLGRP_ND_USEROPT = 20
-S.RTNLGRP_PHONET_IFADDR = 21
-S.RTNLGRP_PHONET_ROUTE = 22
-S.RTNLGRP_DCB = 23
+c.RTNLGRP = setmetatable({
+  NONE = 0,
+  LINK = 1,
+  NOTIFY = 2,
+  NEIGH = 3,
+  TC = 4,
+  IPV4_IFADDR = 5,
+  IPV4_MROUTE = 6,
+  IPV4_ROUTE = 7,
+  IPV4_RULE = 8,
+  IPV6_IFADDR = 9,
+  IPV6_MROUTE = 10,
+  IPV6_ROUTE = 11,
+  IPV6_IFINFO = 12,
+-- DECNET_IFADDR = 13,
+  NOP2 = 14,
+-- DECNET_ROUTE = 15,
+-- DECNET_RULE = 16,
+  NOP4 = 17,
+  IPV6_PREFIX = 18,
+  IPV6_RULE = 19,
+  ND_USEROPT = 20,
+  PHONET_IFADDR = 21,
+  PHONET_ROUTE = 22,
+  DCB = 23,
+}, stringflag)
 
 -- address families
-S.AF = setmetatable({
+c.AF = setmetatable({
   UNSPEC     = 0,
   LOCAL      = 1,
   INET       = 2,
@@ -1193,12 +1382,12 @@ S.AF = setmetatable({
   NFC        = 39,
 }, stringflag)
 
-S.AF.UNIX       = S.AF.LOCAL
-S.AF.FILE       = S.AF.LOCAL
-S.AF.ROUTE      = S.AF.NETLINK
+c.AF.UNIX       = c.AF.LOCAL
+c.AF.FILE       = c.AF.LOCAL
+c.AF.ROUTE      = c.AF.NETLINK
 
 -- arp types, which are also interface types for ifi_type
-S.ARPHRD = setmetatable({
+c.ARPHRD = setmetatable({
   NETROM   = 0,
   ETHER    = 1,
   EETHER   = 2,
@@ -1261,10 +1450,10 @@ S.ARPHRD = setmetatable({
   NONE     = 0xFFFE,
 }, stringflag)
 
-S.ARPHRD.HDLC     = S.ARPHRD.CISCO
+c.ARPHRD.HDLC     = c.ARPHRD.CISCO
 
 -- IP
-S.IPPROTO = setmetatable({
+c.IPPROTO = setmetatable({
   IP = 0,
   HOPOPTS = 0, -- TODO overloaded namespace?
   ICMP = 1,
@@ -1297,53 +1486,62 @@ S.IPPROTO = setmetatable({
 }, stringflag)
 
 -- eventfd
-S.EFD_SEMAPHORE = 1
-S.EFD_CLOEXEC = octal("02000000")
-S.EFD_NONBLOCK = octal("04000")
+c.EFD = setmetatable({
+  SEMAPHORE = 1,
+  CLOEXEC = octal("02000000"),
+  NONBLOCK = octal("04000"),
+}, multiflags)
 
--- mount and umount
-S.MS_RDONLY = 1
-S.MS_NOSUID = 2
-S.MS_NODEV = 4
-S.MS_NOEXEC = 8
-S.MS_SYNCHRONOUS = 16
-S.MS_REMOUNT = 32
-S.MS_MANDLOCK = 64
-S.MS_DIRSYNC = 128
-S.MS_NOATIME = 1024
-S.MS_NODIRATIME = 2048
-S.MS_BIND = 4096
-S.MS_MOVE = 8192
-S.MS_REC = 16384
-S.MS_SILENT = 32768
-S.MS_POSIXACL = bit.lshift(1, 16)
-S.MS_UNBINDABLE = bit.lshift(1, 17)
-S.MS_PRIVATE = bit.lshift(1, 18)
-S.MS_SLAVE = bit.lshift(1, 19)
-S.MS_SHARED = bit.lshift(1, 20)
-S.MS_RELATIME = bit.lshift(1, 21)
-S.MS_KERNMOUNT = bit.lshift(1, 22)
-S.MS_I_VERSION = bit.lshift(1, 23)
-S.MS_STRICTATIME = bit.lshift(1, 24)
-S.MS_ACTIVE = bit.lshift(1, 30)
-S.MS_NOUSER = bit.lshift(1, 31)
+-- mount
+c.MS = setmetatable({
+  RDONLY = 1,
+  NOSUID = 2,
+  NODEV = 4,
+  NOEXEC = 8,
+  SYNCHRONOUS = 16,
+  REMOUNT = 32,
+  MANDLOCK = 64,
+  DIRSYNC = 128,
+  NOATIME = 1024,
+  NODIRATIME = 2048,
+  BIND = 4096,
+  MOVE = 8192,
+  REC = 16384,
+  SILENT = 32768,
+  POSIXACL = bit.lshift(1, 16),
+  UNBINDABLE = bit.lshift(1, 17),
+  PRIVATE = bit.lshift(1, 18),
+  SLAVE = bit.lshift(1, 19),
+  SHARED = bit.lshift(1, 20),
+  RELATIME = bit.lshift(1, 21),
+  KERNMOUNT = bit.lshift(1, 22),
+  I_VERSION = bit.lshift(1, 23),
+  STRICTATIME = bit.lshift(1, 24),
+  ACTIVE = bit.lshift(1, 30),
+  NOUSER = bit.lshift(1, 31),
+}, multiflags)
 
 -- fake flags
-S.MS_RO = S.MS_RDONLY -- allow use of "ro" as flag as that is what /proc/mounts uses
-S.MS_RW = 0           -- allow use of "rw" as flag as appears in /proc/mounts
+c.MS.RO = c.MS.RDONLY -- allow use of "ro" as flag as that is what /proc/mounts uses
+c.MS.RW = 0           -- allow use of "rw" as flag as appears in /proc/mounts
 
-S.MNT_FORCE = 1
-S.MNT_DETACH = 2
-S.MNT_EXPIRE = 4
-S.UMOUNT_NOFOLLOW = 8
+-- flags to `msync'. - note was MS_ renamed to MSYNC_
+c.MSYNC = setmetatable({
+  ASYNC       = 1,
+  INVALIDATE  = 2,
+  SYNC        = 4,
+}, multiflags)
 
--- flags to `msync'.
-S.MS_ASYNC       = 1
-S.MS_SYNC        = 4
-S.MS_INVALIDATE  = 2
+-- one table for umount as it uses MNT_ and UMOUNT_ options
+c.UMOUNT = setmetatable({
+  FORCE    = 1,
+  DETACH   = 2,
+  EXPIRE   = 4,
+  NOFOLLOW = 8,
+}, multiflags)
 
 -- reboot
-S.LINUX_REBOOT_CMD = setmetatable({
+c.LINUX_REBOOT_CMD = setmetatable({
   RESTART      =  0x01234567,
   HALT         =  0xCDEF0123,
   CAD_ON       =  0x89ABCDEF,
@@ -1355,69 +1553,74 @@ S.LINUX_REBOOT_CMD = setmetatable({
 }, stringflag)
 
 -- clone
-S.CLONE_VM      = 0x00000100
-S.CLONE_FS      = 0x00000200
-S.CLONE_FILES   = 0x00000400
-S.CLONE_SIGHAND = 0x00000800
-S.CLONE_PTRACE  = 0x00002000
-S.CLONE_VFORK   = 0x00004000
-S.CLONE_PARENT  = 0x00008000
-S.CLONE_THREAD  = 0x00010000
-S.CLONE_NEWNS   = 0x00020000
-S.CLONE_SYSVSEM = 0x00040000
-S.CLONE_SETTLS  = 0x00080000
-S.CLONE_PARENT_SETTID  = 0x00100000
-S.CLONE_CHILD_CLEARTID = 0x00200000
-S.CLONE_DETACHED = 0x00400000
-S.CLONE_UNTRACED = 0x00800000
-S.CLONE_CHILD_SETTID = 0x01000000
-S.CLONE_NEWUTS   = 0x04000000
-S.CLONE_NEWIPC   = 0x08000000
-S.CLONE_NEWUSER  = 0x10000000
-S.CLONE_NEWPID   = 0x20000000
-S.CLONE_NEWNET   = 0x40000000
-S.CLONE_IO       = 0x80000000
+c.CLONE = setmetatable({
+  VM      = 0x00000100,
+  FS      = 0x00000200,
+  FILES   = 0x00000400,
+  SIGHAND = 0x00000800,
+  PTRACE  = 0x00002000,
+  VFORK   = 0x00004000,
+  PARENT  = 0x00008000,
+  THREAD  = 0x00010000,
+  NEWNS   = 0x00020000,
+  SYSVSEM = 0x00040000,
+  SETTLS  = 0x00080000,
+  PARENT_SETTID  = 0x00100000,
+  CHILD_CLEARTID = 0x00200000,
+  DETACHED = 0x00400000,
+  UNTRACED = 0x00800000,
+  CHILD_SETTID = 0x01000000,
+  NEWUTS   = 0x04000000,
+  NEWIPC   = 0x08000000,
+  NEWUSER  = 0x10000000,
+  NEWPID   = 0x20000000,
+  NEWNET   = 0x40000000,
+  IO       = 0x80000000,
+}, multiflags)
 
 -- inotify
--- flags
-S.IN_CLOEXEC = octal("02000000")
-S.IN_NONBLOCK = octal("04000")
+-- flags note rename from IN_ to IN_INIT
+c.IN_INIT = setmetatable({
+  CLOEXEC = octal("02000000"),
+  NONBLOCK = octal("04000"),
+}, multiflags)
 
 -- events
-S.IN_ACCESS        = 0x00000001
-S.IN_MODIFY        = 0x00000002
-S.IN_ATTRIB        = 0x00000004
-S.IN_CLOSE_WRITE   = 0x00000008
-S.IN_CLOSE_NOWRITE = 0x00000010
-S.IN_OPEN          = 0x00000020
-S.IN_MOVED_FROM    = 0x00000040
-S.IN_MOVED_TO      = 0x00000080
-S.IN_CREATE        = 0x00000100
-S.IN_DELETE        = 0x00000200
-S.IN_DELETE_SELF   = 0x00000400
-S.IN_MOVE_SELF     = 0x00000800
+c.IN = setmetatable({
+  ACCESS        = 0x00000001,
+  MODIFY        = 0x00000002,
+  ATTRIB        = 0x00000004,
+  CLOSE_WRITE   = 0x00000008,
+  CLOSE_NOWRITE = 0x00000010,
+  OPEN          = 0x00000020,
+  MOVED_FROM    = 0x00000040,
+  MOVED_TO      = 0x00000080,
+  CREATE        = 0x00000100,
+  DELETE        = 0x00000200,
+  DELETE_SELF   = 0x00000400,
+  MOVE_SELF     = 0x00000800,
+  UNMOUNT       = 0x00002000,
+  Q_OVERFLOW    = 0x00004000,
+  IGNORED       = 0x00008000,
 
-S.IN_UNMOUNT       = 0x00002000
-S.IN_Q_OVERFLOW    = 0x00004000
-S.IN_IGNORED       = 0x00008000
+  ONLYDIR       = 0x01000000,
+  DONT_FOLLOW   = 0x02000000,
+  EXCL_UNLINK   = 0x04000000,
+  MASK_ADD      = 0x20000000,
+  ISDIR         = 0x40000000,
+  ONESHOT       = 0x80000000,
+}, multiflags)
 
-S.IN_CLOSE         = S.IN_CLOSE_WRITE + S.IN_CLOSE_NOWRITE
-S.IN_MOVE          = S.IN_MOVED_FROM + S.IN_MOVED_TO
+c.IN.CLOSE         = c.IN.CLOSE_WRITE + c.IN.CLOSE_NOWRITE
+c.IN.MOVE          = c.IN.MOVED_FROM + c.IN.MOVED_TO
 
-S.IN_ONLYDIR       = 0x01000000
-S.IN_DONT_FOLLOW   = 0x02000000
-S.IN_EXCL_UNLINK   = 0x04000000
-S.IN_MASK_ADD      = 0x20000000
-S.IN_ISDIR         = 0x40000000
-S.IN_ONESHOT       = 0x80000000
-
-S.IN_ALL_EVENTS    = S.IN_ACCESS + S.IN_MODIFY + S.IN_ATTRIB + S.IN_CLOSE_WRITE
-                       + S.IN_CLOSE_NOWRITE + S.IN_OPEN + S.IN_MOVED_FROM
-                       + S.IN_MOVED_TO + S.IN_CREATE + S.IN_DELETE
-                       + S.IN_DELETE_SELF + S.IN_MOVE_SELF
+c.IN.ALL_EVENTS    = c.IN.ACCESS + c.IN.MODIFY + c.IN.ATTRIB + c.IN.CLOSE_WRITE
+                       + c.IN.CLOSE_NOWRITE + c.IN.OPEN + c.IN.MOVED_FROM
+                       + c.IN.MOVED_TO + c.IN.CREATE + c.IN.DELETE
+                       + c.IN.DELETE_SELF + c.IN.MOVE_SELF
 
 --prctl
-S.PR = setmetatable({
+c.PR = setmetatable({
   SET_PDEATHSIG = 1,
   GET_PDEATHSIG = 2,
   GET_DUMPABLE  = 3,
@@ -1454,19 +1657,19 @@ S.PR = setmetatable({
 }, stringflag)
 
 -- for PR get/set unalign
-S.PR_UNALIGN = setmetatable({
+c.PR_UNALIGN = setmetatable({
   NOPRINT   = 1,
   SIGBUS    = 2,
 }, stringflag)
 
 -- for PR fpemu
-S.PR_FPEMU = setmetatable({
+c.PR_FPEMU = setmetatable({
   NOPRINT     = 1,
   SIGFPE      = 2,
 }, stringflag)
 
 -- for PR fpexc
-S.PR_FP_EXC = setmetatable({
+c.PR_FP_EXC = setmetatable({
   SW_ENABLE  = 0x80,
   DIV        = 0x010000,
   OVF        = 0x020000,
@@ -1480,38 +1683,38 @@ S.PR_FP_EXC = setmetatable({
 }, stringflag) -- TODO should be a combo of stringflag and flags
 
 -- PR get set timing
-S.PR_TIMING = setmetatable({
+c.PR_TIMING = setmetatable({
   STATISTICAL= 0,
   TIMESTAMP  = 1,
 }, stringflag)
 
 -- PR set endian
-S.PR_ENDIAN = setmetatable({
+c.PR_ENDIAN = setmetatable({
   BIG         = 0,
   LITTLE      = 1,
   PPC_LITTLE  = 2,
 }, stringflag)
 
 -- PR TSC
-S.PR_TSC = setmetatable({
+c.PR_TSC = setmetatable({
   ENABLE         = 1,
   SIGSEGV        = 2,
 }, stringflag)
 
-S.PR_MCE_KILL = setmetatable({
+c.PR_MCE_KILL = setmetatable({
   CLEAR     = 0,
   SET       = 1,
 }, stringflag)
 
 -- note rename, this is extra option see prctl code
-S.PR_MCE_KILL_OPT = setmetatable({
+c.PR_MCE_KILL_OPT = setmetatable({
   LATE         = 0,
   EARLY        = 1,
   DEFAULT      = 2,
 }, stringflag)
 
 -- capabilities
-S.CAP = setmetatable({
+c.CAP = setmetatable({
   CHOWN = 0,
   DAC_OVERRIDE = 1,
   DAC_READ_SEARCH = 2,
@@ -1551,92 +1754,94 @@ S.CAP = setmetatable({
 }, stringflag)
 
 -- new SECCOMP modes, now there is filter as well as strict
-S.SECCOMP_MODE = setmetatable({
+c.SECCOMP_MODE = setmetatable({
   DISABLED = 0,
   STRICT   = 1,
   FILTER   = 2,
 }, stringflag)
 
-S.SECCOMP_RET_KILL      = 0x00000000
-S.SECCOMP_RET_TRAP      = 0x00030000
-S.SECCOMP_RET_ERRNO     = 0x00050000
-S.SECCOMP_RET_TRACE     = 0x7ff00000
-S.SECCOMP_RET_ALLOW     = 0x7fff0000
+c.SECCOMP_RET = setmetatable({
+  KILL      = 0x00000000,
+  TRAP      = 0x00030000,
+  ERRNO     = 0x00050000,
+  TRACE     = 0x7ff00000,
+  ALLOW     = 0x7fff0000,
 
-S.SECCOMP_RET_ACTION    = 0xffff0000 -- note unsigned 
-S.SECCOMP_RET_DATA      = 0x0000ffff
+  ACTION    = 0xffff0000, -- note unsigned 
+  DATA      = 0x0000ffff,
+}, multiflags)
 
 -- termios
-S.NCCS = 32
+c.NCCS = 32
 
 -- termios - c_cc characters
-S.VINTR    = 0
-S.VQUIT    = 1
-S.VERASE   = 2
-S.VKILL    = 3
-S.VEOF     = 4
-S.VTIME    = 5
-S.VMIN     = 6
-S.VSWTC    = 7
-S.VSTART   = 8
-S.VSTOP    = 9
-S.VSUSP    = 10
-S.VEOL     = 11
-S.VREPRINT = 12
-S.VDISCARD = 13
-S.VWERASE  = 14
-S.VLNEXT   = 15
-S.VEOL2    = 16
+c.VINTR    = 0
+c.VQUIT    = 1
+c.VERASE   = 2
+c.VKILL    = 3
+c.VEOF     = 4
+c.VTIME    = 5
+c.VMIN     = 6
+c.VSWTC    = 7
+c.VSTART   = 8
+c.VSTOP    = 9
+c.VSUSP    = 10
+c.VEOL     = 11
+c.VREPRINT = 12
+c.VDISCARD = 13
+c.VWERASE  = 14
+c.VLNEXT   = 15
+c.VEOL2    = 16
 
 -- termios - c_iflag bits
-S.IGNBRK  = octal('0000001')
-S.BRKINT  = octal('0000002')
-S.IGNPAR  = octal('0000004')
-S.PARMRK  = octal('0000010')
-S.INPCK   = octal('0000020')
-S.ISTRIP  = octal('0000040')
-S.INLCR   = octal('0000100')
-S.IGNCR   = octal('0000200')
-S.ICRNL   = octal('0000400')
-S.IUCLC   = octal('0001000')
-S.IXON    = octal('0002000')
-S.IXANY   = octal('0004000')
-S.IXOFF   = octal('0010000')
-S.IMAXBEL = octal('0020000')
-S.IUTF8   = octal('0040000')
+c.IGNBRK  = octal('0000001')
+c.BRKINT  = octal('0000002')
+c.IGNPAR  = octal('0000004')
+c.PARMRK  = octal('0000010')
+c.INPCK   = octal('0000020')
+c.ISTRIP  = octal('0000040')
+c.INLCR   = octal('0000100')
+c.IGNCR   = octal('0000200')
+c.ICRNL   = octal('0000400')
+c.IUCLC   = octal('0001000')
+c.IXON    = octal('0002000')
+c.IXANY   = octal('0004000')
+c.IXOFF   = octal('0010000')
+c.IMAXBEL = octal('0020000')
+c.IUTF8   = octal('0040000')
 
 -- termios - c_oflag bits
-S.OPOST  = octal('0000001')
-S.OLCUC  = octal('0000002')
-S.ONLCR  = octal('0000004')
-S.OCRNL  = octal('0000010')
-S.ONOCR  = octal('0000020')
-S.ONLRET = octal('0000040')
-S.OFILL  = octal('0000100')
-S.OFDEL  = octal('0000200')
-S.NLDLY  = octal('0000400')
-S.NL0    = octal('0000000')
-S.NL1    = octal('0000400')
-S.CRDLY  = octal('0003000')
-S.CR0    = octal('0000000')
-S.CR1    = octal('0001000')
-S.CR2    = octal('0002000')
-S.CR3    = octal('0003000')
-S.TABDLY = octal('0014000')
-S.TAB0   = octal('0000000')
-S.TAB1   = octal('0004000')
-S.TAB2   = octal('0010000')
-S.TAB3   = octal('0014000')
-S.BSDLY  = octal('0020000')
-S.BS0    = octal('0000000')
-S.BS1    = octal('0020000')
-S.FFDLY  = octal('0100000')
-S.FF0    = octal('0000000')
-S.FF1    = octal('0100000')
-S.VTDLY  = octal('0040000')
-S.VT0    = octal('0000000')
-S.VT1    = octal('0040000')
-S.XTABS  = octal('0014000')
+c.OPOST  = octal('0000001')
+c.OLCUC  = octal('0000002')
+c.ONLCR  = octal('0000004')
+c.OCRNL  = octal('0000010')
+c.ONOCR  = octal('0000020')
+c.ONLRET = octal('0000040')
+c.OFILL  = octal('0000100')
+c.OFDEL  = octal('0000200')
+c.NLDLY  = octal('0000400')
+c.NL0    = octal('0000000')
+c.NL1    = octal('0000400')
+c.CRDLY  = octal('0003000')
+c.CR0    = octal('0000000')
+c.CR1    = octal('0001000')
+c.CR2    = octal('0002000')
+c.CR3    = octal('0003000')
+c.TABDLY = octal('0014000')
+c.TAB0   = octal('0000000')
+c.TAB1   = octal('0004000')
+c.TAB2   = octal('0010000')
+c.TAB3   = octal('0014000')
+c.BSDLY  = octal('0020000')
+c.BS0    = octal('0000000')
+c.BS1    = octal('0020000')
+c.FFDLY  = octal('0100000')
+c.FF0    = octal('0000000')
+c.FF1    = octal('0100000')
+c.VTDLY  = octal('0040000')
+c.VT0    = octal('0000000')
+c.VT1    = octal('0040000')
+c.XTABS  = octal('0014000')
 
 -- TODO rework this with functions in a metatable
 local bits_speed_map = { }
@@ -1645,21 +1850,21 @@ local function defspeed(speed, bits)
   bits = octal(bits)
   bits_speed_map[bits] = speed
   speed_bits_map[speed] = bits
-  S['B'..speed] = bits
+  c['B'..speed] = bits -- TODO in table
 end
-function S.bits_to_speed(bits)
+function c.bits_to_speed(bits)
   local speed = bits_speed_map[bits]
   if not speed then error("unknown speedbits: " .. bits) end
   return speed
 end
-function S.speed_to_bits(speed)
+function c.speed_to_bits(speed)
   local bits = speed_bits_map[speed]
   if not bits then error("unknown speed: " .. speed) end
   return bits
 end
 
 -- termios - c_cflag bit meaning
-S.CBAUD      = octal('0010017')
+c.CBAUD      = octal('0010017')
 defspeed(0, '0000000') -- hang up
 defspeed(50, '0000001')
 defspeed(75, '0000002')
@@ -1676,20 +1881,20 @@ defspeed(4800, '0000014')
 defspeed(9600, '0000015')
 defspeed(19200, '0000016')
 defspeed(38400, '0000017')
-S.EXTA       = S.B19200
-S.EXTB       = S.B38400
-S.CSIZE      = octal('0000060')
-S.CS5        = octal('0000000')
-S.CS6        = octal('0000020')
-S.CS7        = octal('0000040')
-S.CS8        = octal('0000060')
-S.CSTOPB     = octal('0000100')
-S.CREAD      = octal('0000200')
-S.PARENB     = octal('0000400')
-S.PARODD     = octal('0001000')
-S.HUPCL      = octal('0002000')
-S.CLOCAL     = octal('0004000')
-S.CBAUDEX    = octal('0010000')
+c.EXTA       = c.B19200
+c.EXTB       = c.B38400
+c.CSIZE      = octal('0000060')
+c.CS5        = octal('0000000')
+c.CS6        = octal('0000020')
+c.CS7        = octal('0000040')
+c.CS8        = octal('0000060')
+c.CSTOPB     = octal('0000100')
+c.CREAD      = octal('0000200')
+c.PARENB     = octal('0000400')
+c.PARODD     = octal('0001000')
+c.HUPCL      = octal('0002000')
+c.CLOCAL     = octal('0004000')
+c.CBAUDEX    = octal('0010000')
 defspeed(57600, '0010001')
 defspeed(115200, '0010002')
 defspeed(230400, '0010003')
@@ -1705,30 +1910,30 @@ defspeed(2500000, '0010014')
 defspeed(3000000, '0010015')
 defspeed(3500000, '0010016')
 defspeed(4000000, '0010017')
-S.__MAX_BAUD = S.B4000000
-S.CIBAUD     = octal('002003600000') -- input baud rate (not used)
-S.CMSPAR     = octal('010000000000') -- mark or space (stick) parity
-S.CRTSCTS    = octal('020000000000') -- flow control
+c.__MAX_BAUD = c.B4000000
+c.CIBAUD     = octal('002003600000') -- input baud rate (not used)
+c.CMSPAR     = octal('010000000000') -- mark or space (stick) parity
+c.CRTSCTS    = octal('020000000000') -- flow control
 
 -- termios - c_lflag bits
-S.ISIG    = octal('0000001')
-S.ICANON  = octal('0000002')
-S.XCASE   = octal('0000004')
-S.ECHO    = octal('0000010')
-S.ECHOE   = octal('0000020')
-S.ECHOK   = octal('0000040')
-S.ECHONL  = octal('0000100')
-S.NOFLSH  = octal('0000200')
-S.TOSTOP  = octal('0000400')
-S.ECHOCTL = octal('0001000')
-S.ECHOPRT = octal('0002000')
-S.ECHOKE  = octal('0004000')
-S.FLUSHO  = octal('0010000')
-S.PENDIN  = octal('0040000')
-S.IEXTEN  = octal('0100000')
+c.ISIG    = octal('0000001')
+c.ICANON  = octal('0000002')
+c.XCASE   = octal('0000004')
+c.ECHO    = octal('0000010')
+c.ECHOE   = octal('0000020')
+c.ECHOK   = octal('0000040')
+c.ECHONL  = octal('0000100')
+c.NOFLSH  = octal('0000200')
+c.TOSTOP  = octal('0000400')
+c.ECHOCTL = octal('0001000')
+c.ECHOPRT = octal('0002000')
+c.ECHOKE  = octal('0004000')
+c.FLUSHO  = octal('0010000')
+c.PENDIN  = octal('0040000')
+c.IEXTEN  = octal('0100000')
 
 -- termios - tcflow() and TCXONC use these. renamed from TC to TCFLOW
-S.TCFLOW = setmetatable({
+c.TCFLOW = setmetatable({
   OOFF = 0,
   OON  = 1,
   IOFF = 2,
@@ -1736,53 +1941,53 @@ S.TCFLOW = setmetatable({
 }, stringflag)
 
 -- termios - tcflush() and TCFLSH use these. renamed from TC to TCFLUSH
-S.TCFLUSH = setmetatable({
+c.TCFLUSH = setmetatable({
   IFLUSH  = 0,
   OFLUSH  = 1,
   IOFLUSH = 2,
 }, stringflag)
 
 -- termios - tcsetattr uses these
-S.TCSA = setmetatable({
+c.TCSA = setmetatable({
   NOW   = 0,
   DRAIN = 1,
   FLUSH = 2,
 }, stringflag)
 
 -- TIOCM ioctls
-S.TIOCM_LE  = 0x001
-S.TIOCM_DTR = 0x002
-S.TIOCM_RTS = 0x004
-S.TIOCM_ST  = 0x008
-S.TIOCM_SR  = 0x010
-S.TIOCM_CTS = 0x020
-S.TIOCM_CAR = 0x040
-S.TIOCM_RNG = 0x080
-S.TIOCM_DSR = 0x100
-S.TIOCM_CD  = S.TIOCM_CAR
-S.TIOCM_RI  = S.TIOCM_RNG
+c.TIOCM_LE  = 0x001
+c.TIOCM_DTR = 0x002
+c.TIOCM_RTS = 0x004
+c.TIOCM_ST  = 0x008
+c.TIOCM_SR  = 0x010
+c.TIOCM_CTS = 0x020
+c.TIOCM_CAR = 0x040
+c.TIOCM_RNG = 0x080
+c.TIOCM_DSR = 0x100
+c.TIOCM_CD  = c.TIOCM_CAR
+c.TIOCM_RI  = c.TIOCM_RNG
 
 -- ioctls, filling in as needed
-S.SIOCGIFINDEX   = 0x8933
+c.SIOCGIFINDEX   = 0x8933
 
-S.SIOCBRADDBR    = 0x89a0
-S.SIOCBRDELBR    = 0x89a1
-S.SIOCBRADDIF    = 0x89a2
-S.SIOCBRDELIF    = 0x89a3
+c.SIOCBRADDBR    = 0x89a0
+c.SIOCBRDELBR    = 0x89a1
+c.SIOCBRADDIF    = 0x89a2
+c.SIOCBRDELIF    = 0x89a3
 
-S.TIOCMGET       = 0x5415
-S.TIOCMBIS       = 0x5416
-S.TIOCMBIC       = 0x5417
-S.TIOCMSET       = 0x5418
-S.TIOCGPTN	 = 0x80045430LL
-S.TIOCSPTLCK	 = 0x40045431LL
+c.TIOCMGET       = 0x5415
+c.TIOCMBIS       = 0x5416
+c.TIOCMBIC       = 0x5417
+c.TIOCMSET       = 0x5418
+c.TIOCGPTN	 = 0x80045430LL
+c.TIOCSPTLCK	 = 0x40045431LL
 
 -- sysfs values
-S.SYSFS_BRIDGE_ATTR        = "bridge"
-S.SYSFS_BRIDGE_FDB         = "brforward"
-S.SYSFS_BRIDGE_PORT_SUBDIR = "brif"
-S.SYSFS_BRIDGE_PORT_ATTR   = "brport"
-S.SYSFS_BRIDGE_PORT_LINK   = "bridge"
+c.SYSFS_BRIDGE_ATTR        = "bridge"
+c.SYSFS_BRIDGE_FDB         = "brforward"
+c.SYSFS_BRIDGE_PORT_SUBDIR = "brif"
+c.SYSFS_BRIDGE_PORT_ATTR   = "brport"
+c.SYSFS_BRIDGE_PORT_LINK   = "bridge"
 
 -- sizes -- should we export?
 local HOST_NAME_MAX = 64
@@ -1790,7 +1995,7 @@ local IFNAMSIZ      = 16
 local IFHWADDRLEN   = 6
 
 -- errors
-S.E = {
+c.E = {
   EPERM          =  1,
   ENOENT         =  2,
   ESRCH          =  3,
@@ -1923,9 +2128,9 @@ S.E = {
 }
 
 -- alternate names
-S.E.EWOULDBLOCK    = S.E.EAGAIN
-S.E.EDEADLOCK      = S.E.EDEADLK
-S.E.ENOATTR        = S.E.ENODATA
+c.E.EWOULDBLOCK    = c.E.EAGAIN
+c.E.EDEADLOCK      = c.E.EDEADLK
+c.E.ENOATTR        = c.E.ENODATA
 
-return S
+return c
 

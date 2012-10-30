@@ -1,5 +1,6 @@
 -- Linux kernel types
 -- these are either simple ffi types or ffi metatypes for the kernel types
+-- plus some Lua metatables for types that cannot be sensibly done as Lua types eg arrays, integers
 
 -- TODO this currently requires being called with S from syscall which breaks modularity
 -- TODO should fix this, should just need constants (which it could return)
@@ -9,35 +10,11 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-require "include/headers"
+require "include.headers"
 
-local function init(S)
+local c = require "include.constants"
 
---[[
-We do not want to pass S, we only need a littl from it, eliminating it gradually
-
-should be metatable? of what?
-major
-minor
-makdev
-
-mksigset
-
-these are man 3 dont need to export?
-htons     DONE
-ntohs     DONE
-strerror  DONE
-inet_pton
-inet_ntop
-
-inet_name (uses inet_pton)
-
-temporary, as these are going away.
-stringflags, flaglist
-]]
-
--- TODO remove when replaced with metatables
-local stringflags, flaglist = S.stringflags, S.flaglist
+local C = ffi.C -- for inet_pton etc, due to be replaced with Lua
 
 local types = {}
 
@@ -62,43 +39,43 @@ end
 local signal_reasons_gen = {}
 local signal_reasons = {}
 
-for k, v in pairs(S.SI) do
+for k, v in pairs(c.SI) do
   signal_reasons_gen[v] = k
 end
 
-signal_reasons[S.SIG.ILL] = {}
-for k, v in pairs(S.ILL) do
-  signal_reasons[S.SIG.ILL][v] = k
+signal_reasons[c.SIG.ILL] = {}
+for k, v in pairs(c.SIGILL) do
+  signal_reasons[c.SIG.ILL][v] = k
 end
 
-signal_reasons[S.SIG.FPE] = {}
-for k, v in pairs(S.FPE) do
-  signal_reasons[S.SIG.FPE][v] = k
+signal_reasons[c.SIG.FPE] = {}
+for k, v in pairs(c.SIGFPE) do
+  signal_reasons[c.SIG.FPE][v] = k
 end
 
-signal_reasons[S.SIG.SEGV] = {}
-for k, v in pairs(S.SEGV) do
-  signal_reasons[S.SIG.SEGV][v] = k
+signal_reasons[c.SIG.SEGV] = {}
+for k, v in pairs(c.SIGSEGV) do
+  signal_reasons[c.SIG.SEGV][v] = k
 end
 
-signal_reasons[S.SIG.BUS] = {}
-for k, v in pairs(S.BUS) do
-  signal_reasons[S.SIG.BUS][v] = k
+signal_reasons[c.SIG.BUS] = {}
+for k, v in pairs(c.SIGBUS) do
+  signal_reasons[c.SIG.BUS][v] = k
 end
 
-signal_reasons[S.SIG.TRAP] = {}
-for k, v in pairs(S.TRAP) do
-  signal_reasons[S.SIG.TRAP][v] = k
+signal_reasons[c.SIG.TRAP] = {}
+for k, v in pairs(c.SIGTRAP) do
+  signal_reasons[c.SIG.TRAP][v] = k
 end
 
-signal_reasons[S.SIG.CHLD] = {}
-for k, v in pairs(S.CLD) do
-  signal_reasons[S.SIG.CHLD][v] = k
+signal_reasons[c.SIG.CHLD] = {}
+for k, v in pairs(c.SIGCLD) do
+  signal_reasons[c.SIG.CHLD][v] = k
 end
 
-signal_reasons[S.SIG.POLL] = {}
-for k, v in pairs(S.POLL) do
-  signal_reasons[S.SIG.POLL][v] = k
+signal_reasons[c.SIG.POLL] = {}
+for k, v in pairs(c.SIGPOLL) do
+  signal_reasons[c.SIG.POLL][v] = k
 end
 
 -- endian conversion
@@ -246,8 +223,8 @@ metatype("error", "struct {int errno;}", {
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
     if k == 'lsym' then return errsyms[t.errno]:sub(2):lower() end
-    if S.E[k] then return S.E[k] == t.errno end
-    local uk = S.E['E' .. k:upper()]
+    if c.E[k] then return c.E[k] == t.errno end
+    local uk = c.E['E' .. k:upper()]
     if uk then return uk == t.errno end
   end,
   __new = function(tp, errno)
@@ -274,7 +251,7 @@ meth.sockaddr_storage = {
     family = function(sa) return sa.ss_family end,
   },
   newindex = {
-    family = function(sa, v) sa.ss_family = S.AF[v] end,
+    family = function(sa, v) sa.ss_family = c.AF[v] end,
   }
 }
 
@@ -302,7 +279,7 @@ metatype("sockaddr_storage", "struct sockaddr_storage", {
   __new = function(tp, init)
     local ss = ffi.new(tp)
     local family
-    if init and init.family then family = S.AF[init.family] end
+    if init and init.family then family = c.AF[init.family] end
     local st
     if family then
       st = samap2[family]
@@ -338,7 +315,7 @@ metatype("sockaddr_in", "struct sockaddr_in", {
       addr = t.in_addr(addr)
       if not addr then return end
     end
-    return ffi.new(tp, S.AF.INET, htons(port or 0), addr)
+    return ffi.new(tp, c.AF.INET, htons(port or 0), addr)
   end
 })
 
@@ -361,7 +338,7 @@ metatype("sockaddr_in6", "struct sockaddr_in6", {
       addr = t.in6_addr(addr)
       if not addr then return end
     end
-    return ffi.new(tp, S.AF.INET6, htons(port or 0), flowinfo or 0, addr, scope_id or 0)
+    return ffi.new(tp, c.AF.INET6, htons(port or 0), flowinfo or 0, addr, scope_id or 0)
   end
 })
 
@@ -373,13 +350,13 @@ meth.sockaddr_un = {
 
 metatype("sockaddr_un", "struct sockaddr_un", {
   __index = function(sa, k) if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end end,
-  __new = function(tp) return ffi.new(tp, S.AF.UNIX) end,
+  __new = function(tp) return ffi.new(tp, c.AF.UNIX) end,
 })
 
 local nlgroupmap = { -- map from netlink socket type to group names. Note there are two forms of name though, bits and shifts.
-  [S.NETLINK.ROUTE] = "RTMGRP_", -- or RTNLGRP_ and shift not mask TODO make shiftflags function
+  [c.NETLINK.ROUTE] = c.RTMGRP, -- or RTNLGRP_ and shift not mask TODO make shiftflags function
   -- add rest of these
-  [S.NETLINK.SELINUX] = "SELNLGRP_",
+--  [c.NETLINK.SELINUX] = c.SELNLGRP,
 }
 
 meth.sockaddr_nl = {
@@ -402,21 +379,63 @@ metatype("sockaddr_nl", "struct sockaddr_nl", {
       local tb = pid
       pid, groups, nltype = tb.nl_pid or tb.pid, tb.nl_groups or tb.groups, tb.type
     end
-    if nltype and nlgroupmap[nltype] then groups = stringflags(groups, nlgroupmap[nltype]) end -- see note about shiftflags
-    return ffi.new(tp, {nl_family = S.AF.NETLINK, nl_pid = pid, nl_groups = groups})
+    if nltype and nlgroupmap[nltype] then groups = nlgroupmap[nltype][groups] end -- see note about shiftflags
+    return ffi.new(tp, {nl_family = c.AF.NETLINK, nl_pid = pid, nl_groups = groups})
   end,
 })
 
 samap = {
-  [S.AF.UNIX] = t.sockaddr_un,
-  [S.AF.INET] = t.sockaddr_in,
-  [S.AF.INET6] = t.sockaddr_in6,
-  [S.AF.NETLINK] = t.sockaddr_nl,
+  [c.AF.UNIX] = t.sockaddr_un,
+  [c.AF.INET] = t.sockaddr_in,
+  [c.AF.INET6] = t.sockaddr_in6,
+  [c.AF.NETLINK] = t.sockaddr_nl,
 }
+
+-- 64 to 32 bit conversions via unions TODO use meth not object?
+
+if ffi.abi("le") then
+mt.i6432 = {
+  __index = {
+    to32 = function(u) return u.i32[1], u.i32[0] end,
+  }
+}
+else
+mt.i6432 = {
+  __index = {
+    to32 = function(u) return u.i32[0], u.i32[1] end,
+  }
+}
+end
+
+t.i6432 = ffi.metatype("union {int64_t i64; int32_t i32[2];}", mt.i6432)
+t.u6432 = ffi.metatype("union {uint64_t i64; uint32_t i32[2];}", mt.i6432)
+
+-- Lua metatables where we cannot return an ffi type eg value is an array or integer or otherwise problematic
+
+-- TODO should we change to meth
+mt.device = {
+  __index = {
+    major = function(dev)
+      local h, l = t.i6432(dev.dev):to32()
+      return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)));
+    end,
+    minor = function(dev)
+      local h, l = t.i6432(dev.dev):to32()
+      return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)));
+    end,
+    device = function(dev) return tonumber(dev.dev) end,
+  },
+}
+
+t.device = function(major, minor)
+    local dev = major
+    if minor then dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff)) end
+    return setmetatable({dev = t.dev(dev)}, mt.device)
+  end
 
 meth.stat = {
   index = {
-    dev = function(st) return tonumber(st.st_dev) end,
+    dev = function(st) return t.device(st.st_dev) end,
     ino = function(st) return tonumber(st.st_ino) end,
     mode = function(st) return st.st_mode end,
     nlink = function(st) return st.st_nlink end,
@@ -429,15 +448,14 @@ meth.stat = {
     atime = function(st) return tonumber(st.st_atime) end,
     ctime = function(st) return tonumber(st.st_ctime) end,
     mtime = function(st) return tonumber(st.st_mtime) end,
-    major = function(st) return S.major(st.st_rdev) end,
-    minor = function(st) return S.minor(st.st_rdev) end,
-    isreg = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFREG end,
-    isdir = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFDIR end,
-    ischr = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFCHR end,
-    isblk = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFBLK end,
-    isfifo = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFIFO end,
-    islnk = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFLNK end,
-    issock = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFSOCK end,
+    rdev = function(st) return t.device(st.st_rdev) end,
+    isreg = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFREG end,
+    isdir = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFDIR end,
+    ischr = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFCHR end,
+    isblk = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFBLK end,
+    isfifo = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFIFO end,
+    islnk = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFLNK end,
+    issock = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFSOCK end,
   }
 }
 
@@ -659,9 +677,7 @@ t.iovecs = ffi.metatype("struct { int count; struct iovec iov[?];}", mt.iovecs) 
 metatype("pollfd", "struct pollfd", {
   __index = function(t, k)
     if k == 'getfd' then return t.fd end -- TODO use meth
-    local prefix = "POLL"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.revents, S[k]) ~= 0
+    return bit.band(t.revents, c.POLL[k]) ~= 0
   end
 })
 
@@ -680,7 +696,7 @@ mt.pollfds = {
     local fds = ffi.new(tp, count, count)
     for n = 1, count do
       fds[n].fd = ps[n].fd:getfd()
-      fds[n].events = stringflags(ps[n].events, "POLL")
+      fds[n].events = c.POLL[ps[n].events]
       fds[n].revents = 0
     end
     return fds
@@ -711,7 +727,7 @@ meth.signalfd = {
 
 metatype("signalfd_siginfo", "struct signalfd_siginfo", {
   __index = function(ss, k)
-    if ss.ssi_signo == S.SIG(k) then return true end
+    if ss.ssi_signo == c.SIG(k) then return true end
     local rname = signal_reasons_gen[ss.ssi_code]
     if not rname and signal_reasons[ss.ssi_signo] then rname = signal_reasons[ss.ssi_signo][ss.ssi_code] end
     if rname == k then return true end
@@ -732,31 +748,56 @@ mt.siginfos = {
 
 t.siginfos = ffi.metatype("struct {int count, bytes; struct signalfd_siginfo sfd[?];}", mt.siginfos)
 
+local INET6_ADDRSTRLEN = 46
+
+local function inet_ntop(af, src)
+  af = c.AF[af] -- TODO do not need, in fact could split into two functions if no need to export.
+  if af == c.AF.INET then
+    local b = pt.uchar(src)
+    return tonumber(b[0]) .. "." .. tonumber(b[1]) .. "." .. tonumber(b[2]) .. "." .. tonumber(b[3])
+  end
+  local len = INET6_ADDRSTRLEN
+  local dst = t.buffer(len)
+  local ret = C.inet_ntop(af, src, dst, len) -- TODO replace with pure Lua
+  if ret == nil then return nil, t.error() end
+  return ffi.string(dst)
+end
+
+local function inet_pton(af, src, addr)
+  af = c.AF[af]
+  if not addr then addr = t.addrtype[af]() end
+  local ret = C.inet_pton(af, src, addr) -- TODO redo in pure Lua
+  if ret == -1 then return nil, t.error() end
+  if ret == 0 then return nil end -- maybe return string
+  return addr
+end
+
+-- TODO add generic address type that works out which to take? basically inet_name, except without netmask
+
 metatype("in_addr", "struct in_addr", {
-  __tostring = function(a) return S.inet_ntop(S.AF.INET, a) end,
+  __tostring = function(a) return inet_ntop(c.AF.INET, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then addr = S.inet_pton(S.AF.INET, s, addr) end
+    if s then addr = inet_pton(c.AF.INET, s, addr) end
     return addr
   end
 })
 
 metatype("in6_addr", "struct in6_addr", {
-  __tostring = function(a) return S.inet_ntop(S.AF.INET6, a) end,
+  __tostring = function(a) return inet_ntop(c.AF.INET6, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then addr = S.inet_pton(S.AF.INET6, s, addr) end
+    if s then addr = inet_pton(c.AF.INET6, s, addr) end
     return addr
   end
 })
 
-S.addrtype = {
-  [S.AF.INET] = t.in_addr,
-  [S.AF.INET6] = t.in6_addr,
+t.addrtype = {
+  [c.AF.INET] = t.in_addr,
+  [c.AF.INET6] = t.in6_addr,
 }
 
 -- signal set handlers TODO replace with metatypes, reuse code from stringflags
-local mksigset = S.mksigset
 
 local function sigismember(set, sig)
   local d = bit.rshift(sig - 1, 5) -- always 32 bits
@@ -771,14 +812,14 @@ local function sigemptyset(set)
 end
 
 local function sigaddset(set, sig)
-  set = mksigset(set)
+  set = t.sigset(set)
   local d = bit.rshift(sig - 1, 5)
   set.val[d] = bit.bor(set.val[d], bit.lshift(1, (sig - 1) % 32))
   return set
 end
 
 local function sigdelset(set, sig)
-  set = mksigset(set)
+  set = t.sigset(set)
   local d = bit.rshift(sig - 1, 5)
   set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
   return set
@@ -809,11 +850,11 @@ end
 
 local function sigaddsets(set, sigs) -- allow multiple
   if type(sigs) ~= "string" then return sigaddset(set, sigs) end
-  set = mksigset(set)
+  set = t.sigset(set)
   local a = split(",", sigs)
   for i, v in ipairs(a) do
     local s = trim(v)
-    local sig = S.SIG[s]
+    local sig = c.SIG[s]
     if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     sigaddset(set, sig)
   end
@@ -822,11 +863,11 @@ end
 
 local function sigdelsets(set, sigs) -- allow multiple
   if type(sigs) ~= "string" then return sigdelset(set, sigs) end
-  set = mksigset(set)
+  set = t.sigset(set)
   local a = split(",", sigs)
   for i, v in ipairs(a) do
     local s = trim(v)
-    local sig = S.SIG[s]
+    local sig = c.SIG[s]
     if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     sigdelset(set, sig)
   end
@@ -838,9 +879,23 @@ metatype("sigset", "sigset_t", {
     if k == 'add' then return sigaddsets end
     if k == 'del' then return sigdelsets end
     if k == 'isemptyset' then return sigemptyset(set) end
-    local sig = S.SIG[k]
+    local sig = c.SIG[k]
     if sig then return sigismember(set, sig) end
-  end
+  end,
+  __new = function(tp, str)
+    if ffi.istype(tp, str) then return str end
+    if not str then return ffi.new(tp) end
+    local f = ffi.new(tp)
+    local a = split(",", str)
+    for i, v in ipairs(a) do
+      local st = trim(v)
+      local sig = c.SIG[st]
+      if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+      local d = bit.rshift(sig - 1, 5) -- always 32 bits
+      f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
+    end
+    return f
+  end,
 })
 
 local voidp = ffi.typeof("void *")
@@ -850,15 +905,12 @@ pt.void = function(x)
 end
 
 samap2 = {
-  [S.AF.UNIX] = pt.sockaddr_un,
-  [S.AF.INET] = pt.sockaddr_in,
-  [S.AF.INET6] = pt.sockaddr_in6,
-  [S.AF.NETLINK] = pt.sockaddr_nl,
+  [c.AF.UNIX] = pt.sockaddr_un,
+  [c.AF.INET] = pt.sockaddr_in,
+  [c.AF.INET6] = pt.sockaddr_in6,
+  [c.AF.NETLINK] = pt.sockaddr_nl,
 }
 
 return types
 
-end -- function init
-
-return init
 
