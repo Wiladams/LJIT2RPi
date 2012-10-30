@@ -51,16 +51,28 @@ function OnKey(loop, w, revents)
 		if event.value == 1 then
 			print("KEYDOWN: ", event.code);
 		elseif event.value == 0 then
+			print("KEYUP: ", event.code);
+
 			if event.code == KEY_ESC then
 				loop:halt();
 				return false;
 			end
 
-			print("KEYUP: ", event.code);
+		elseif event.value == 2 then
+			print("KEYREP: ", event.code);
 		end
 	else
 		--print("EVENT TYPE: ", UI.EventTypes[event.type][2], "CODE:",event.code, "VALUE: ", string.format("0x%x",event.value));
 	end
+end
+
+function OnTTY(loop, w, revents)
+	local bufflen = 10;
+	local buff = ffi.new("char[?]", bufflen);
+
+	local bytesread = S.read(w.fd, buff, bufflen);
+	print("TTY: ", ffi.string(buff, bytesread));
+
 end
 
 function OnMouse(loop, w, revents)
@@ -88,6 +100,19 @@ local kfd = fd:getfd();
 print("FD: ", fd, kfd);
 local iowatcher = ev.ev_io(OnKey, kfd, ffi.C.EV_READ);
 iowatcher:start(loop, true);
+
+function watchtty(filename)
+	local tty, err = S.open("/dev/tty0", "O_RDONLY");
+	if not tty then
+		print("TTY ERROR: ", err);
+		return false
+	end
+
+	local ttyfd = tty:getfd();
+	print("TTY FD: ", ttyfd);
+	local ttywatcher = ev.ev_io(OnTTY, ttyfd, ffi.C.EV_READ);
+	ttywatcher:start(loop, true);
+end
 
 -- Mouse Tracking
 local fd = S.open("/dev/input/event1", "O_RDONLY");
