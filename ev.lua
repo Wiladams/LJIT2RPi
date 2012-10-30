@@ -2,7 +2,9 @@
 --
 -- uses almost-identical API to lua-ev (https://github.com/brimworks/lua-ev)
 --
--- Author:  Evan Wies <evan@neomantra.net>
+-- Borrowed Heavily From:  Evan Wies <evan@neomantra.net>
+--
+-- Enhanced By: William Adams <williamaadams.wordpress.com>
 --
 
 local ffi = require('ffi')
@@ -11,8 +13,23 @@ local bit = require("bit")
 local band, bor = bit.band, bit.bor
 
 
+ffi.cdef[[
+static const int EV_FEATURES = 0x7f;
 
--- extracted from preprocessing <ev.h>
+static const int EV_FEATURE_CODE     = ((EV_FEATURES) &  1);
+static const int EV_FEATURE_DATA     = ((EV_FEATURES) &  2);
+static const int EV_FEATURE_CONFIG   = ((EV_FEATURES) &  4);
+static const int EV_FEATURE_API      = ((EV_FEATURES) &  8);
+static const int EV_FEATURE_WATCHERS = ((EV_FEATURES) & 16);
+static const int EV_FEATURE_BACKENDS = ((EV_FEATURES) & 32);
+static const int EV_FEATURE_OS       = ((EV_FEATURES) & 64);
+]]
+
+ffi.cdef[[
+static const int EV_VERSION_MAJOR = 4;
+static const int EV_VERSION_MINOR = 11;
+]]
+
 ffi.cdef[[
 
 /* eventmask, revents, events... */
