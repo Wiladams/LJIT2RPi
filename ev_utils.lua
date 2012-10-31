@@ -5,7 +5,8 @@ local bor = bit.bor
 
 require "ev"
 
-local libev = ffi.load('libev.so.4.0.0')
+local libev = ffi.load('libev.so.4')
+--local libev = ffi.load('libev.so.4.0.0')
 --local libev = ffi.load("libev");
 --local libev = require "libev"
 

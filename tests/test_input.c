@@ -11,10 +11,13 @@ http://www.linuxjournal.com/article/6429
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <linux/input.h>
 
 #define KEYBOARDEVENTS "/dev/input/event1"
+
+#define test_bit(yalv, abs_b) ((((char *)abs_b)[yalv/8] & (1<<yalv%8)) > 0)
 
 void Listing1(fd)
 {
@@ -101,10 +104,12 @@ void Listing6(fd)
 	printf("The device on says its identity is %s\n", uniq);
 }
 
+/*
 void Listing7(fd)
 {	
 	struct input_event evtype_b;
-	
+	int yalv;
+
 	memset(evtype_b, 0, sizeof(evtype_b));
 	if (ioctl(fd, EVIOCGBIT(0, EV_MAX), evtype_b) < 0) 
 	{
@@ -117,56 +122,70 @@ void Listing7(fd)
 	{
 		if (test_bit(yalv, evtype_b)) 
 		{
-			/* the bit is set in the event types list */
+			// the bit is set in the event types list
 			printf("  Event type 0x%02x ", yalv);
 			switch ( yalv)
-            {
+            		{
 				case EV_SYN :
 					printf(" (Synch Events)\n");
-                break;
+                		break;
+				
 				case EV_KEY :
 					printf(" (Keys or Buttons)\n");
-                break;
+                		break;
+
 				case EV_REL :
 					printf(" (Relative Axes)\n");
-                break;
+                		break;
+
 				case EV_ABS :
 					printf(" (Absolute Axes)\n");
-                break;
+                		break;
+
 				case EV_MSC :
 					printf(" (Miscellaneous)\n");
-                break;
+		                break;
+
 				case EV_LED :
 					printf(" (LEDs)\n");
-                break;
+                		break;
+
 				case EV_SND :
 					printf(" (Sounds)\n");
-                break;
+		                break;
+
 				case EV_REP :
 					printf(" (Repeat)\n");
-                break;
+		                break;
+
 				case EV_FF :
 				case EV_FF_STATUS:
 					printf(" (Force Feedback)\n");
-                break;
+		                break;
+
 				case EV_PWR:
 					printf(" (Power Management)\n");
-                break;
+		                break;
+
 				default:
 					printf(" (Unknown: 0x%04hx)\n",yalv);
-            }
+            		}
 		}
 	}
 }
+*/
 
 void Listing8(fd)
 {
-	/* how many bytes were read */
+	int yalv;
+
+	// how many bytes were read 
 	size_t rb;
-	/* the events (up to 64 at once) */
+	
+	// the events (up to 64 at once)
 	struct input_event ev[64];
 
-	rb=read(fd,ev,sizeof(struct input_event)*64);
+	rb = read(fd,ev,sizeof(struct input_event)*64);
 
 	if (rb < (int) sizeof(struct input_event)) 
 	{
@@ -179,12 +198,10 @@ void Listing8(fd)
 		yalv++)
 	{
 		if (EV_KEY == ev[yalv].type)
-			printf("%ld.%06ld ",
-				ev[yalv].time.tv_sec,
-				ev[yalv].time.tv_usec,
-			printf("type %d code %d value %d\n",
-               ev[yalv].type,
-               ev[yalv].code, ev[yalv].value);
+		{
+			printf("%ld.%06ld ",ev[yalv].time.tv_sec, ev[yalv].time.tv_usec);
+		}
+		printf("type %d code %d value %d\n", ev[yalv].type, ev[yalv].code, ev[yalv].value);
 	}
 }
 
@@ -196,7 +213,8 @@ void Listing9(fd)
 	ev.type = EV_LED;
 	ev.code = LED_CAPSL;
 	ev.value = 0;
-	retval = write(fd, &ev, sizeof(struct input_event));
+
+	int retval = write(fd, &ev, sizeof(struct input_event));
 
 	ev.code = LED_NUML;
 	retval = write(fd, &ev, sizeof(struct input_event));
@@ -227,7 +245,7 @@ void Listing9(fd)
 */
 void Listing10(fd)
 {
-	uint8_t key_b[KEY_MAX/8 + 1];
+	unsigned char key_b[KEY_MAX/8 + 1];
 	int yalv;
 
 	memset(key_b, 0, sizeof(key_b));
@@ -263,29 +281,34 @@ void Listing10(fd)
 
 void Listing11(fd)
 {
-	struct input_event led_b;
-	
+	unsigned char led_b[LED_MAX/8 + 1];
+	int yalv;
+
 	memset(led_b, 0, sizeof(led_b));
-	ioctl(fd, EVIOCGLED(sizeof(led_b)), led_b);
+	int err = ioctl(fd, EVIOCGLED(sizeof(led_b)), led_b);
+
+	printf("Listing11, ioctl: %d\n", err);
 
 	for (yalv = 0; yalv < LED_MAX; yalv++) 
 	{
 		if (test_bit(yalv, led_b)) 
 		{
-			/* the bit is set in the LED state */
+			// the bit is set in the LED state
 			printf("  LED 0x%02x ", yalv);
 			switch ( yalv)
-            {
+            		{
 				case LED_NUML :
-                printf(" (Num Lock)\n");
-                break;
+                		printf(" (Num Lock)\n");
+                		break;
+				
 				case LED_CAPSL :
-                printf(" (Caps Lock)\n");
-                break;
-				/* other LEDs not shown here*/
+                		printf(" (Caps Lock)\n");
+                		break;
+				
+				// other LEDs not shown here
 				default:
-                printf(" (Unknown LED: 0x%04hx)\n", yalv);
-            }
+                			printf(" (Unknown LED: 0x%04hx)\n", yalv);
+            		}
 		}
 	}
 }
@@ -303,7 +326,7 @@ void Listing12(fd)
 }
 
 void Listing13(fd)
-
+{
 	int rep[2];
 
 	rep[0] = 2500;
@@ -319,6 +342,7 @@ void Listing13(fd)
 void Listing14(fd)
 {
 	int codes[2];
+	int i;
 
 	for (i=0; i<130; i++) 
 	{
@@ -347,8 +371,9 @@ void Listing15(fd)
 
 void Listing17(fd)
 {
-	uint8_t abs_b[ABS_MAX/8 + 1];
+	unsigned char abs_b[ABS_MAX/8 + 1];
 	struct input_absinfo abs_feat;
+	int yalv;
 
 	ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(abs_b)), abs_b);
 
@@ -408,7 +433,7 @@ int main (void)
 	Listing4(kbd);
 	Listing5(kbd);
 	Listing6(kbd);
-
+	Listing11(kbd);
 
 	close(kbd);
 
