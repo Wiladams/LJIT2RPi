@@ -5,12 +5,13 @@ local DMX = require "DisplayManX"
 local Display = DMXDisplay();
 local screenWidth, screenHeight = Display:GetSize();
 local ratio = screenWidth / screenHeight;
-local displayHeight = 70;
-local displayWidth = displayHeight * ratio;
+local displayHeight = 320;
+local displayWidth = 640;
+--local displayHeight = 70;
+--local displayWidth = displayHeight * ratio;
 
 
--- Create the view that will display the snapshot
-local displayView = Display:CreateView(displayWidth, displayHeight, 0, screenHeight-displayHeight-1)
+
 
 
 
@@ -25,29 +26,49 @@ local function WritePPM(filename, pixbuff)
     local header = string.format("P6\n%d %d\n255\n", pixbuff.Width, pixbuff.Height)
     fp:write(header);
 
-    local data = ffi.string(pixbuff.Data, pixbuff.Width*pixbuff.Height * 3);
-    fp:write(data);
-
-
---[[
-    for r = 0, pixbuff.Height-1 do
-		for c = 0, pixbuff.Width-1 do
-			local offset = (r*pixbuff.Width)+c
-			local pix = pixbuff.Data[offset]:ToArray();
-			fp:write(pix);
-		end
+    for row=0,pixbuff.Height-1 do
+	local dataPtr = ffi.cast("char *",pixbuff.Data) + pixbuff.Pitch*row
+    	local data = ffi.string(dataPtr, pixbuff.Width*3);
+    	fp:write(data);
     end
---]]
 
     fp:close();
 end
 
--- Do the snapshot
-displayView:Hide();	
-Display:Snapshot(displayView.Resource);
-displayView:Show();
 
-ffi.C.sleep(5);
+-- Create the view that will display the snapshot
+local displayView = Display:CreateView(
+	displayWidth, displayHeight, 
+	0, screenHeight-displayHeight-1,
+	0, ffi.C.VC_IMAGE_RGB888)
 
---WritePPM("desktop_"..i..".ppm", pixmap);
+
+-- Create the resource that will be used
+-- to copy the screen into.  Do this so that
+-- we can reuse the same chunk of memory
+local p_rect = VC_RECT_T(0,0,displayWidth, displayHeight);
+local pixdata = displayView.Resource:CreateCompatiblePixmap(p_rect.width, p_rect.height);
+
+local framecount = 15
+
+for i=1,framecount do
+	-- Do the snapshot
+	displayView:Hide();	
+	Display:Snapshot(displayView.Resource);
+	displayView:Show();
+
+
+	local pixeldata, err = displayView.Resource:ReadPixelData(pixdata, p_rect);
+	if pixeldata then
+		-- Write the data out
+		local filename = string.format("screencast/desktop_%06d.ppm", i);
+		print("Writing: ", filename);
+
+		WritePPM(filename, pixeldata);
+	end
+
+	ffi.C.sleep(1);
+end
+
+
 	

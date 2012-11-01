@@ -18,10 +18,6 @@ local displayView = Display:CreateView(
 	0, ffi.C.VC_IMAGE_RGB888)
 
 
--- Do the snapshot
-displayView:Hide();	
-Display:Snapshot(displayView.Resource);
-displayView:Show();
 
 
 local function WritePPM(filename, pixbuff)
@@ -43,6 +39,12 @@ local function WritePPM(filename, pixbuff)
 
     fp:close();
 end
+
+
+-- Do the snapshot
+displayView:Hide();	
+Display:Snapshot(displayView.Resource);
+displayView:Show();
 
 
 local pixeldata, err = displayView.Resource:ReadPixelData();
