@@ -406,6 +406,8 @@ DMXElement_mt = {
 				self.Handle = DISPMANX_NO_HANDLE;
 			end
 		end,
+
+
 	},
 }
 ffi.metatype(DMXElement, DMXElement_mt);
@@ -607,7 +609,33 @@ DMXView.Show = function(self)
 	self.Surface = self.Display:CreateElement(dst_rect, self.Resource, src_rect, self.Layer, DISPMANX_PROTECTION_NONE, alpha);
 end
 
+DMXView.MoveTo = function(self, x, y)
+	local update = DMXUpdate(10);
+	
+	if not update then
+		return false;
+	end
 
+
+	local dst_rect = VC_RECT_T(x, y, self.Width, self.Height);
+	local src_rect = VC_RECT_T( 0, 0, lshift(self.Width, 16), lshift(self.Height, 16) );
+
+	self.X = x;
+	self.Y = y;
+	local change_flags = 0;
+	local mask = 0;
+	local transform = self.Transform or ffi.C.VC_IMAGE_ROT0;
+
+	DisplayManX.element_change_attributes(update.Handle, self.Handle,
+		change_flags,
+		self.Layer,
+		self.Opacity,
+		dest_rect, src_rect,
+		mask,
+		transform);
+
+	update:SubmitSync();
+end
 
 
 
