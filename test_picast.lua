@@ -36,29 +36,24 @@ local function WritePPM(filename, pixbuff)
 end
 
 
--- Create the view that will display the snapshot
-local displayView = Display:CreateView(
-	displayWidth, displayHeight, 
-	0, screenHeight-displayHeight-1,
-	0, ffi.C.VC_IMAGE_RGB888)
-
 
 -- Create the resource that will be used
 -- to copy the screen into.  Do this so that
 -- we can reuse the same chunk of memory
-local p_rect = VC_RECT_T(0,0,displayWidth, displayHeight);
-local pixdata = displayView.Resource:CreateCompatiblePixmap(p_rect.width, p_rect.height);
+local resource = DMXResource(displayWidth, displayHeight, ffi.C.VC_IMAGE_RGB888);
 
-local framecount = 15
+local p_rect = VC_RECT_T(0,0,displayWidth, displayHeight);
+local pixdata = resource:CreateCompatiblePixmap(displayWidth, displayHeight);
+
+local framecount = 120
+
 
 for i=1,framecount do
 	-- Do the snapshot
-	displayView:Hide();	
-	Display:Snapshot(displayView.Resource);
-	displayView:Show();
+	Display:Snapshot(resource);
 
 
-	local pixeldata, err = displayView.Resource:ReadPixelData(pixdata, p_rect);
+	local pixeldata, err = resource:ReadPixelData(pixdata, p_rect);
 	if pixeldata then
 		-- Write the data out
 		local filename = string.format("screencast/desktop_%06d.ppm", i);
@@ -67,7 +62,7 @@ for i=1,framecount do
 		WritePPM(filename, pixeldata);
 	end
 
-	ffi.C.sleep(1);
+	--ffi.C.sleep(1);
 end
 
 
