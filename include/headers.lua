@@ -7,6 +7,8 @@ local ok, arch = pcall(require, "include/headers-" .. ffi.arch) -- architecture 
 
 if not ok then arch = {} end
 
+require "include/ioctl"
+
 -- define C types
 ffi.cdef[[
 

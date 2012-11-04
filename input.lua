@@ -1,7 +1,7 @@
 
 local ffi = require "ffi"
-require "include/headers"
-require "include/ioctl"
+--require "include/headers"
+--require "include/ioctl"
 
 --[[
  * Copyright (c) 1999-2002 Vojtech Pavlik

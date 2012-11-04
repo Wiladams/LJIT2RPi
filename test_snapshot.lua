@@ -3,6 +3,8 @@ local ffi = require "ffi"
 local DMX = require "DisplayManX"
 
 local Display = DMXDisplay();
+Display:SetBackground(0,0,0);
+
 local screenWidth, screenHeight = Display:GetSize();
 local ratio = screenWidth / screenHeight;
 local displayHeight = 320;
