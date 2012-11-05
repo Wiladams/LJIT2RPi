@@ -4,56 +4,9 @@ local ffi = require "ffi"
 
 local S = require "syscall"
 local UI = require "input"
-
-IOEventEmitter = {}
-IOEventEmitter_mt = {
-	__index = IOEventEmitter,
-}
-
-function IOEventEmitter.new()
-	local handle, err = S.epoll_create();
-	if not handle then
-		return false, err
-	end
-
-	local obj = {
-		Handle	= handle,
-	}
-
-	setmetatable(obj, IOEventEmitter_mt);
-
-	return obj;
-	
-end
+local IOAlertEmitter = require "IOAlertEmitter"
 
 
-function IOEventEmitter:ModifyDescriptor(fd)
-	return S.epoll_ctl(self.Handle, S.c.EPOLL_CTL.MOD, fd, event); 
-end
-
-function IOEventEmitter:Wait(timeout, events, maxevents)
-	timeout = timeout or 0
-
-	return S.epoll_wait(self.Handle, events, maxevents, timeout);
-end
-
---[[
-	event must have the following:
-	Descriptor - file descriptor
-	actions - bitwise OR of actions to observe
---]]
-
-function IOEventEmitter:AddObserver(observer)
-	local event = S.t.epoll_event();
-	event.events = observer.actions;
-	event.data.fd = observer.Descriptor:getfd();
-
-	return S.epoll_ctl(self.Handle, S.c.EPOLL_CTL.ADD, event.data.fd, event);
-end
-
-function IOEventEmitter:RemoveObserver(observer)
-	return S.epoll_ctl(self.Handle, S.c.EPOLL_CTL.DEL, observer.fd, nil); 
-end
 
 
 --[[ 
@@ -142,7 +95,9 @@ end
 	Create Observers
 --]]
 
-local emitter = IOEventEmitter.new();
+local emitter = IOAlertEmitter.new();
+
+assert(emitter, "Did not create alert emitter");
 
 local keyObserver = AddKeyboardObserver(emitter, OnKey);
 
