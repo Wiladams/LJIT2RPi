@@ -9,6 +9,7 @@ EventLoop.new = function()
 	local obj = {
 		Observers = {},
 		Emitter = IOAlertEmitter.new(),
+		Running = false;
 	}
 
 	setmetatable(obj, EventLoop_mt);
@@ -17,17 +18,23 @@ EventLoop.new = function()
 end
 
 
-EventLoop.AddEmitter = function(self, emitter, observer)
-	observer = observer or emitter
-	self.Observers[emitter.AlertHandle:getfd()] = observer;
+EventLoop.AddObservable = function(self, observable, observer)
+	observer = observer or observable
+	self.Observers[observable.AlertHandle:getfd()] = observer;
 
-	return self.Emitter:AddAlertable(emitter.AlertHandle, observer.OnAlert, emitter.WhichAlerts);
+	return self.Emitter:AddAlertable(observable.AlertHandle, observer.OnAlert, observable.WhichAlerts);
+end
+
+EventLoop.Halt = function(self)
+	self.Running = false;
 end
 
 EventLoop.Run = function(self, timeout)
 	timeout = timeout or 0
 
-	while true do
+	self.Running = true;
+
+	while self.Running do
 		local alerts, err = self.Emitter:Wait(timeout)
 
 		if alerts and #alerts > 0 then
@@ -37,14 +44,14 @@ EventLoop.Run = function(self, timeout)
 				-- get the appropriate observer
 				local observer = self.Observers[alerts[i].fd];
 				if observer and observer.OnAlert then
-					observer:OnAlert(alerts[i])
+					observer:OnAlert(self, alerts[i].fd, alerts[i].events)
 				end
 			end
 		end
 
 		-- Allow some idle work to occur
 		if self.OnIdle then
-			self.OnIdle()
+			self.OnIdle(self)
 		end
 	end
 end

@@ -12,8 +12,9 @@ local ffi = require "ffi"
 --]]
 
 --[[
- * The event structure itself
- --]]
+	The event structure itself
+--]]
+
 ffi.cdef[[
 struct input_event {
 	struct timeval time;
