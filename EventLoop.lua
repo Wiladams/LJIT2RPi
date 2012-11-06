@@ -1,14 +1,18 @@
 local IOAlertEmitter = require "IOAlertEmitter"
 
-local EventLoop = {}
+local EventLoop = {
+	MaxEvents = 16,
+}
 local EventLoop_mt = {
 	__index = EventLoop,
 }
 
-EventLoop.new = function()
+EventLoop.new = function(timeout, maxevents)
+	maxevents = maxevents or EventLoop.MaxEvents
+
 	local obj = {
 		Observers = {},
-		Emitter = IOAlertEmitter.new(),
+		Emitter = IOAlertEmitter.new(timeout, maxevents),
 		Running = false;
 	}
 
@@ -35,16 +39,16 @@ EventLoop.Run = function(self, timeout)
 	self.Running = true;
 
 	while self.Running do
-		local alerts, err = self.Emitter:Wait(timeout)
+		local alerts, count = self.Emitter:EPollWait()
 
-		if alerts and #alerts > 0 then
-			for i=1,#alerts do
-				--print("Event: ", alerts[i].fd, alerts[i].events);
+		if alerts and count > 0 then
+			for i=0,count-1 do
+				--print("Event: ", alerts[i].data.fd, alerts[i].events);
 				
 				-- get the appropriate observer
-				local observer = self.Observers[alerts[i].fd];
+				local observer = self.Observers[alerts[i].data.fd];
 				if observer and observer.OnAlert then
-					observer:OnAlert(self, alerts[i].fd, alerts[i].events)
+					observer:OnAlert(self, alerts[i].data.fd, alerts[i].events)
 				end
 			end
 		end

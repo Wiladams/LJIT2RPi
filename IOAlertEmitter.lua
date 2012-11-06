@@ -8,14 +8,22 @@ local IOAlertEmitter_mt = {
 	__index = IOAlertEmitter,
 }
 
-function IOAlertEmitter.new()
+function IOAlertEmitter.new(timeout, maxevents)
+	timeout = timeout or -1
+	maxevents = maxevents or 16
+
 	local handle, err = S.epoll_create();
 	if not handle then
 		return false, err
 	end
 
+	local eventBuffer = S.t.epoll_events(maxevents)
+
 	local obj = {
 		AlertHandle	= handle,
+		MaxEvents = maxevents,
+		EventBuffer = eventBuffer,
+		Timeout = timeout,
 	}
 
 	setmetatable(obj, IOAlertEmitter_mt);
@@ -57,8 +65,21 @@ function IOAlertEmitter:RemoveObserver(observer)
 	return S.epoll_ctl(self.AlertHandle, S.c.EPOLL_CTL.DEL, observer.fd, nil); 
 end
 
+function IOAlertEmitter:EPollWait()  
+	local ret = S.C.epoll_wait(self.AlertHandle:getfd(), self.EventBuffer, self.MaxEvents, self.Timeout)
+  	if ret == -1 then 
+		return nil, S.t.error() 
+	end
+
+	return self.EventBuffer, ret
+end
+
 function IOAlertEmitter:Wait(timeout, events, maxevents)
-	timeout = timeout or 0
+	timeout = timeout or 0;
+	if not maxevents then
+		events = self.EventBuffer;
+		maxevents = self.MaxEvents;
+	end
 
 	return S.epoll_wait(self.AlertHandle, events, maxevents, timeout);
 end
