@@ -9,6 +9,9 @@ local band = bit.band
 -- Bring in the necessary UI stuff
 local rpiui = require "rpiui"
 
+local Keyboard = require "Keyboard"
+local EventLoop = require "EventLoop"
+
 local GLES = rpiui.GLES;
 local EGL = rpiui.EGL;
 local OpenVG = rpiui.OpenVG;
@@ -22,17 +25,14 @@ local screenHeight = 480;
 
 local mainWindow = EGL.Window.new(screenWidth, screenHeight, nil, EGL.EGL_OPENVG_API);
 
---[[
-local RenderClass = require"Drawing"
--- Create the renderer so we can do some drawing
-local Renderer = RenderClass.new(mainWindow.Display, screenWidth, screenHeight);
---]]
+
 
 
 require "tiger"
 
 
 local rotateN = 0.0;
+local rotateFactor = 1;
 
 local aspectRatio = 612.0 / 792.0;
 
@@ -335,29 +335,47 @@ end
 --]]
 
 
-
 tiger = PS.construct(tigerCommands, tigerCommandCount, tigerPoints, tigerPointCount);
 
 
-glViewport(0,0,screenWidth,screenHeight);
-glMatrixMode(GL_PROJECTION);
-glLoadIdentity();
-
---[[
-local ratio = screenWidth/screenHeight;
-glFrustumf(-ratio, ratio, -1, 1, 1, 10);
---]]
 
 
-while (true) do
+-- Setup an event loop and keyboard
+loop = EventLoop.new(15);
+
+
+
+local kbd = Keyboard.new();
+
+function OnIdle(loop)
 	render(tiger, screenWidth, screenHeight);
-	rotateN = rotateN + 1.0;
+	rotateN = rotateN + (1.0 * rotateFactor);
 end
 
--- Sleep for a few seconds so we can see the results
-local seconds = 3
-print( string.format("Sleeping for %d seconds...", seconds ));
-ffi.C.sleep( seconds )
+OnKeyUp = function(kbd, keycode)
+
+  	-- Halt the loop if they press the "Esc" key
+  	if keycode == KEY_ESC then
+    		loop:Halt();
+  	end
+
+	-- Change direction of rotation when space
+	-- bar is pressed
+	if keycode == KEY_SPACE then
+		rotateFactor = -1 * rotateFactor;
+	end
+end
+
+-- Setup some keyboard with event handlers
+kbd.OnKeyUp = OnKeyUp;
+
+loop:AddObservable(kbd);
+loop.OnIdle = OnIdle;
+
+
+loop:Run(15);
+
+
 
 deinit();
 
