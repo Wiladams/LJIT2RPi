@@ -4,8 +4,8 @@ local ffi = require "ffi"
 
 local B = string.byte;
 
-tigerCommandCount = 4151;
-tigerCommands = ffi.new("char[4151]",  {
+local tigerCommandCount = 4151;
+local tigerCommands = ffi.new("char[4151]",  {
 B'F', B'N', B'B', B'M', B'M', B'L', B'L', B'L', B'E', B'F', B'N', B'B', B'M', B'M', B'C', B'C', B'C', B'E', B'N', B'S', 
 B'B', B'M', B'M', B'C', B'C', B'C', B'E', B'F', B'N', B'B', B'M', B'M', B'C', B'C', B'C', B'E', B'N', B'S', B'B', B'M', 
 B'M', B'C', B'C', B'C', B'E', B'F', B'N', B'B', B'M', B'M', B'C', B'C', B'C', B'E', B'N', B'S', B'B', B'M', B'M', B'C', 
@@ -215,13 +215,13 @@ B'E', B'F', B'N', B'R', B'M', B'M', B'C', B'C', B'C', B'E', B'F', B'N', B'R', B'
 B'N', B'R', B'M', B'M', B'L', B'C', B'L', B'N', B'S', B'R', B'M', B'M', B'L', B'N', B'S', B'R', B'M', B'M', B'C', B'N', 
 B'S', B'R', B'M', B'M', B'C', B'N', B'S', B'R', B'M', B'M', B'C'});
 
-tigerMinX = 0.0;
-tigerMaxX = 612.0;
-tigerMinY = 0.0;
-tigerMaxY = 792.0;
+local tigerMinX = 0.0;
+local tigerMaxX = 612.0;
+local tigerMinY = 0.0;
+local tigerMaxY = 792.0;
 
-tigerPointCount = 17005;
-tigerPoints = ffi.new("float [17005]", {
+local tigerPointCount = 17005;
+local tigerPoints = ffi.new("float [17005]", {
 10, 0, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 5, 0, 
 792, 0, 0, 612, 0, 612, 792, 10, 0, 1, 
 1, 1, 1, 1, 1, 5, 85.25, 487.75, 85.25, 487.75, 
@@ -1923,6 +1923,20 @@ tigerPoints = ffi.new("float [17005]", {
 183.25, 210.75, 183.25, 210.75, 185.348, 217.547, 178.246, 212.746, 10, 1.1, 
 0, 0, 0, 0, 0, 0, 2, 242.246, 200.75, 242.246, 
 200.75, 244.199, 213.148, 231.246, 198.75});
+
+
+return {
+	CommandCount = tigerCommandCount;
+	Commands = tigerCommands;
+
+	MinX = tigerMinX;
+	MaxX = tigerMaxX;
+	MinY = tigerMinY;
+	MaxY = tigerMaxY;
+
+	PointCount = tigerPointCount;
+	Points = tigerPoints;
+}
 
 --[[
 /*------------------------------------------------------------------------
