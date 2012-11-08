@@ -33,25 +33,38 @@ EventLoop.Halt = function(self)
 	self.Running = false;
 end
 
+EventLoop.OnPollEnd = function(self, alerts, count)
+	if alerts and count > 0 then
+		for i=0,count-1 do
+			--print("Event: ", alerts[i].data.fd, alerts[i].events);
+				
+			-- get the appropriate observer
+			local observer = self.Observers[alerts[i].data.fd];
+			if observer and observer.OnAlert then
+				observer:OnAlert(self, alerts[i].data.fd, alerts[i].events)
+			end
+		end
+	end
+end
+
+
 EventLoop.Run = function(self, timeout)
 	timeout = timeout or 0
 
 	self.Running = true;
 
 	while self.Running do
+		if self.OnPollBegin then
+			self.OnPollBegin(self)
+		end
+
 		local alerts, count = self.Emitter:EPollWait()
 
-		if alerts and count > 0 then
-			for i=0,count-1 do
-				--print("Event: ", alerts[i].data.fd, alerts[i].events);
-				
-				-- get the appropriate observer
-				local observer = self.Observers[alerts[i].data.fd];
-				if observer and observer.OnAlert then
-					observer:OnAlert(self, alerts[i].data.fd, alerts[i].events)
-				end
-			end
+
+		if self.OnPollEnd then
+			self.OnPollEnd(self, alerts, count)
 		end
+
 
 		-- Allow some idle work to occur
 		if self.OnIdle then

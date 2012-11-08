@@ -57,7 +57,7 @@ _IOC_WRITE	= 1
 _IOC_READ	= 2
 
 _IOC = function(dir,type,nr,size) 
-	bor(lshift(dir, _IOC_DIRSHIFT), 
+	return bor(lshift(dir, _IOC_DIRSHIFT), 
 	 lshift(type, _IOC_TYPESHIFT), 
 	 lshift(nr, _IOC_NRSHIFT), 
 	 lshift(size, _IOC_SIZESHIFT))

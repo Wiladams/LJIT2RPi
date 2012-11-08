@@ -15,7 +15,8 @@ http://www.linuxjournal.com/article/6429
 
 #include <linux/input.h>
 
-#define KEYBOARDEVENTS "/dev/input/event1"
+#define KEYBOARDEVENTS "/dev/input/event0"
+#define MOUSEEVENTS "/dev/input/event1"
 
 #define test_bit(yalv, abs_b) ((((char *)abs_b)[yalv/8] & (1<<yalv%8)) > 0)
 
@@ -104,10 +105,10 @@ void Listing6(fd)
 	printf("The device on says its identity is %s\n", uniq);
 }
 
-/*
+
 void Listing7(fd)
 {	
-	struct input_event evtype_b;
+	unsigned char evtype_b[EV_MAX/8 + 1];
 	int yalv;
 
 	memset(evtype_b, 0, sizeof(evtype_b));
@@ -173,7 +174,7 @@ void Listing7(fd)
 		}
 	}
 }
-*/
+
 
 void Listing8(fd)
 {
@@ -211,13 +212,14 @@ void Listing9(fd)
 
 	/* we turn off all the LEDs to start */
 	ev.type = EV_LED;
-	ev.code = LED_CAPSL;
 	ev.value = 0;
 
+	ev.code = LED_CAPSL;
 	int retval = write(fd, &ev, sizeof(struct input_event));
 
 	ev.code = LED_NUML;
 	retval = write(fd, &ev, sizeof(struct input_event));
+
 	ev.code = LED_SCROLLL;
 	retval = write(fd, &ev, sizeof(struct input_event));
 
@@ -236,6 +238,14 @@ void Listing9(fd)
 		usleep(200000);
 		ev.value = 0;
 		write(fd, &ev, sizeof(struct input_event));
+
+		ev.code = LED_SCROLLL;
+		ev.value = 1;
+		write(fd, &ev, sizeof(struct input_event));
+		usleep(200000);
+		ev.value = 0;
+		write(fd, &ev, sizeof(struct input_event));
+
 	}
 }
 
@@ -385,27 +395,30 @@ void Listing17(fd)
 		{
 			printf("  Absolute axis 0x%02x ", yalv);
 			switch ( yalv)
-            {
+            		{
 				case ABS_X :
-                printf("(X Axis) ");
-                break;
+                		printf("(X Axis) ");
+               	 		break;
+				
 				case ABS_Y :
-                printf("(Y Axis) ");
-                break;
+                			printf("(Y Axis) ");
+                		break;
+				
 				default:
 					printf("(Unknown abs feature)");
-            }
+            		}
+			
 			if(ioctl(fd, EVIOCGABS(yalv), &abs_feat)) 
 			{
 				perror("evdev EVIOCGABS ioctl");
 			}
 			
 			printf("%d (min:%d max:%d flat:%d fuzz:%d)",
-               abs_feat.value,
-               abs_feat.minimum,
-               abs_feat.maximum,
-               abs_feat.flat,
-               abs_feat.fuzz);
+               		abs_feat.value,
+               		abs_feat.minimum,
+               		abs_feat.maximum,
+               		abs_feat.flat,
+               		abs_feat.fuzz);
 			
 			printf("\n");
 		}
@@ -413,30 +426,69 @@ void Listing17(fd)
 }
 
 
-
-
-int main (void)
+int test_device(const char * devicename)
 {
-	static const bufflen = 256;
-	char buff[bufflen];
-	int kbd;
-	struct input_event ie;
+	int dev;
 
-	if ((kbd = open(KEYBOARDEVENTS, O_RDONLY)) == -1) {
+	if ((dev = open(devicename, O_RDWR)) == -1) {
 		perror("opening device");
 		exit(EXIT_FAILURE);
 	}
 
+	printf("Testing Device: %s\n", devicename);
+
+	Listing1(dev);
+	Listing3(dev);
+	Listing4(dev);
+	Listing5(dev);
+	Listing6(dev);
+	Listing7(dev);
+	Listing12(dev);
+
+	close(dev);
+
+	return 0;
+}
+
+int test_mouse(const char *devicename)
+{
+	int dev;
+
+	if ((dev = open(devicename, O_RDWR)) == -1) {
+		perror("opening device");
+		exit(EXIT_FAILURE);
+	}
+
+	Listing17(dev);
+
+	close(dev);
+
+	return 0;
+}
+
+int flash_keyboard(const char *devicename)
+{
+	int dev;
+
+	if ((dev = open(devicename, O_RDWR)) == -1) {
+		perror("opening device");
+		exit(EXIT_FAILURE);
+	}
+
+	Listing9(dev);
+
+	return 0;
+}
+
+int main (void)
+{
+	//test_device(KEYBOARDEVENTS);
+	//test_device(MOUSEEVENTS);
+	test_mouse(MOUSEEVENTS);
+
+	//flash_keyboard(KEYBOARDEVENTS);
+
 	
-	Listing1(kbd);
-	Listing3(kbd);
-	Listing4(kbd);
-	Listing5(kbd);
-	Listing6(kbd);
-	Listing11(kbd);
-
-	close(kbd);
-
 	return 0;
 }
 
