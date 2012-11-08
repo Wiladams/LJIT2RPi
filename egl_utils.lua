@@ -188,7 +188,7 @@ local function createNativeWindow(dmxdisplay, width, height)
     nativewindow.width = width;
     nativewindow.height = height;
 
-    return nativewindow;
+    return nativewindow, dmxview;
 end
 
 
@@ -211,8 +211,8 @@ EGLWindow.new = function(width, height, config, api)
 
 	-- create nativewindow
 	local dmxdisplay = DMX.DMXDisplay();
-	obj.NativeWindow = createNativeWindow(dmxdisplay, width, height);
-
+	obj.NativeWindow, obj.NativeElement = createNativeWindow(dmxdisplay, width, height);
+	
 	-- create window surface
 	obj.Surface = obj.Display:CreateWindowSurface(obj.NativeWindow);
 	obj.Display:MakeCurrent();

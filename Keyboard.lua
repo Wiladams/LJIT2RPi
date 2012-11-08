@@ -7,7 +7,7 @@ local lshift = bit.lshift
 local S = require "syscall"
 local UI = require "input"
 
-test_bit = function(yalv, abs_b) 
+local test_bit = function(yalv, abs_b) 
 	return (band(ffi.cast("const uint8_t *",abs_b)[yalv/8], lshift(1, yalv%8)) > 0)
 end
 
@@ -18,20 +18,19 @@ local Keyboard_mt = {
 }
 
 
-Keyboard.new = function(devicename)
+Keyboard.new = function(handlers, devicename)
 	devicename = devicename or "/dev/input/event0";
 
 	-- Create Actual Device Handle
-	local devicefd, err = S.open(devicename, S.c.O.RDONLY);
+	local devicefd, err = S.open(devicename, S.c.O.RDWR);
 	if not devicefd then
 		return false, err
 	end
 
-	local obj = {
-		DeviceDescriptor = devicefd,
-		AlertHandle = devicefd,
-		WhichAlerts = S.c.POLL.RDNORM,
-	}
+	local obj = handlers or {}
+	obj.DeviceDescriptor = devicefd;
+	obj.AlertHandle = devicefd;
+	obj.WhichAlerts = S.c.POLL.RDNORM;
 
 	setmetatable(obj, Keyboard_mt)
 
@@ -128,7 +127,7 @@ Keyboard.SetNumLock = function(self, state)
 	self:SetLED(LED_NUML, state)
 end
 
-Keyboard.SetScrollLock(state)
+Keyboard.SetScrollLock = function(self, state)
 	self:SetLED(LED_SCROLLL, state)
 end
 

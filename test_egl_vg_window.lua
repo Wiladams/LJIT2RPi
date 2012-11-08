@@ -17,7 +17,6 @@ local egl = require "egl"
 local screenWidth = 640;
 local screenHeight = 480;
 
-print("EGL API: ", EGL.EGL_OPENVG_API);
 
 local mainWindow = EGL.Window.new(screenWidth, screenHeight, nil, EGL.EGL_OPENVG_API);
 --local mainWindow = EGL.Window.new(screenWidth, screenHeight, nil, EGL.EGL_OPENGLES_API);
@@ -104,7 +103,7 @@ glFrustumf(-ratio, ratio, -1, 1, 1, 10);
 
 
 -- Now, finally do some drawing
---tick(RealDisplay, 1);
+tick(RealDisplay, 1);
 
 
 -- Sleep for a few seconds so we can see the results
