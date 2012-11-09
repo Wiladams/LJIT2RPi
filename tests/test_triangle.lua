@@ -1,4 +1,4 @@
-
+package.path = package.path..";../?.lua"
 
 -- A rotating cube rendered with OpenGL|ES. 
 -- Three images used as textures on the cube faces.

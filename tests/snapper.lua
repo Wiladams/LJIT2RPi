@@ -1,26 +1,25 @@
+package.path = package.path..";../?.lua"
 
 local ffi = require "ffi"
+
+local Keyboard = require "Keyboard"
+local EventLoop = require "EventLoop"
+
 local DMX = require "DisplayManX"
 
 local Display = DMXDisplay();
-Display:SetBackground(0,0,0);
+--Display:SetBackground(0,0,0);
 
 local screenWidth, screenHeight = Display:GetSize();
-local ratio = screenWidth / screenHeight;
 
 local displayHeight = screenHeight;
 local displayWidth = screenWidth;
---local displayHeight = 320;
---local displayWidth = 640;
---local displayHeight = 70;
---local displayWidth = displayHeight * ratio;
 
 
--- Create the view that will display the snapshot
-local displayView = Display:CreateView(
-	displayWidth, displayHeight, 
-	0, screenHeight-displayHeight-1,
-	0, ffi.C.VC_IMAGE_RGB888)
+-- Setup an event loop and keyboard
+local loop = EventLoop.new();
+local kbd = Keyboard.new();
+
 
 
 local function WritePPM(filename, pixbuff)
@@ -43,18 +42,45 @@ local function WritePPM(filename, pixbuff)
     fp:close();
 end
 
+local function TakeSnapshot()
+	-- Create resource used for capturing screen
+	local resource = DMXResource(displayWidth, displayHeight, ffi.C.VC_IMAGE_RGB888);
 
--- Do the snapshot
-Display:Snapshot(displayView.Resource);
+	-- Do the snapshot
+	Display:Snapshot(resource);
 
 
-local pixeldata, err = displayView.Resource:ReadPixelData();
-if pixeldata then
-	-- Write the data out
-	local filename = "media/desktop.ppm"
---	print("Writing: ", filename);
+	local pixeldata, err = resource:ReadPixelData();
+	if pixeldata then
+		-- Write the data out
+		local filename = "media/desktop.ppm"
 
-	WritePPM(filename, pixeldata);
+		WritePPM(filename, pixeldata);
+	end
+
+	print("File Written: ", filename);
 end
+
+
+OnKeyUp = function(kbd, keycode)
+	if keycode == KEY_SYSRQ then
+		TakeSnapshot();
+	end
+  
+  	-- Halt the loop if they press the "Esc" key
+  	if keycode == KEY_ESC then
+    		loop:Halt();
+  	end
+end
+
+
+
+-- Setup some keyboard with event handlers
+kbd.OnKeyUp = OnKeyUp;
+
+loop:AddObservable(kbd);
+
+loop:Run(15);
+
 
 	
