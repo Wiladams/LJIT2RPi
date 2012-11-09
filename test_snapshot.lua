@@ -52,7 +52,7 @@ displayView:Show();
 local pixeldata, err = displayView.Resource:ReadPixelData();
 if pixeldata then
 	-- Write the data out
-	local filename = "desktop.ppm"
+	local filename = "~/desktop.ppm"
 	print("Writing: ", filename);
 
 	WritePPM(filename, pixeldata);

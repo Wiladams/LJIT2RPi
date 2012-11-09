@@ -1,4 +1,3 @@
-package.path = package.path..";interface/?.lua"
 
 local ffi = require "ffi"
 
@@ -11,9 +10,9 @@ int32_t graphics_get_display_size( const uint16_t display_number, uint32_t *widt
 
 require "libc"
 
-require "interface/vc_dispmanx"
-require "interface/vc_tvservice"
-require "interface/vcgencmd"
+require "vc_dispmanx"
+require "vc_tvservice"
+require "vcgencmd"
 
 --[[
 
