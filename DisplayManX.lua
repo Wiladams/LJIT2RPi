@@ -338,9 +338,9 @@ DMXDisplay_mt = {
 			
 			resource = resource or DMXResource(width, height, pFormat);
 
-			local win = DisplayManX.DMXView.new(self, x, y, width, height, layer, pFormat, resource, opacity)
-			
-			return win;
+			local view = DisplayManX.DMXView.new(self, x, y, width, height, layer, pFormat, resource, opacity)
+
+			return view;
 		end,
 
 		GetInfo = function(self)
@@ -558,13 +558,14 @@ local DMXView_mt = {
 	__index = DMXView,
 }
 
-DMXView.new = function(display, x, y, width, height, layer, pformat, resource, opacity)
+DMXView.new = function(display, x, y, width, height, layer, pformat, resource, opacity, show)
 	x = x or 0
 	y = y or 0
 	layer = layer or 0
 	pformat = pformat or ffi.C.VC_IMAGE_RGB565
 	resource = resource or DMXResource(width, height, pformat);
 	opacity = opacity or 1.0;
+	show = show or true;
 
 	local obj = {
 		X = x;
@@ -578,7 +579,9 @@ DMXView.new = function(display, x, y, width, height, layer, pformat, resource, o
 	}
 	setmetatable(obj, DMXView_mt);
 
-	obj:Show();
+	if show then
+		obj:Show();
+	end
 
 	return obj
 end
@@ -609,6 +612,23 @@ DMXView.Show = function(self)
 	self.Surface = self.Display:CreateElement(dst_rect, self.Resource, src_rect, self.Layer, DISPMANX_PROTECTION_NONE, alpha);
 end
 
+--[[
+	change_flags (bit 0 layer, bit 1 opacity, bit 2 dest rect, bit 3 src rect, bit 4 mask, bit 5 transform)
+--]]
+
+local CHANGE_SOURCE		= 0x01;
+local CHANGE_DST_RECT		= 0x02;
+local CHANGE_SRC_RECT		= 0x04;
+local CHANGE_OPACITY 		= 0x08;
+
+local CHANGE_MASK		= 0x10;
+local CHANGE_LAYER	 	= 0x20;
+local CHANGE_TRANSFORM		= 0x40;
+local CHANGE_INSERT_ABOVE	= 0x80;
+
+local CHANGE_FLAGS		= 0x100;
+local CHANGE_NOTHING		= 0x200;
+
 DMXView.MoveTo = function(self, x, y)
 	local update = DMXUpdate(10);
 	
@@ -616,23 +636,29 @@ DMXView.MoveTo = function(self, x, y)
 		return false;
 	end
 
+print("DMXView.MoveTo() - ", x, y, self.Width, self.Height);
 
-	local dst_rect = VC_RECT_T(x, y, self.Width, self.Height);
+	local dst_rect = VC_RECT_T(0, 0, self.Width, self.Height);
 	local src_rect = VC_RECT_T( 0, 0, lshift(self.Width, 16), lshift(self.Height, 16) );
 
 	self.X = x;
 	self.Y = y;
-	local change_flags = 0;
+	local change_flags = bor(CHANGE_DST_RECT, CHANGE_SRC_RECT);
 	local mask = 0;
 	local transform = self.Transform or ffi.C.VC_IMAGE_ROT0;
 
-	DisplayManX.element_change_attributes(update.Handle, self.Handle,
+print("change_flags: ", change_flags);
+
+	local success, err = DisplayManX.element_change_attributes(update.Handle, self.Surface.Handle,
 		change_flags,
 		self.Layer,
 		self.Opacity,
-		dest_rect, src_rect,
+		dest_rect, 
+		src_rect,
 		mask,
 		transform);
+
+--print("DMXView:MoveTo(), ", success, err);
 
 	update:SubmitSync();
 end
@@ -642,7 +668,6 @@ end
 
 
 DisplayManX.DMXPixelData = DMXPixelData;
---DisplayManX.DMXPixelBuffer = DMXPixelBuffer;
 DisplayManX.DMXView = DMXView;
 
 

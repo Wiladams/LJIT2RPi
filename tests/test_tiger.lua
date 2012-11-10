@@ -1,3 +1,5 @@
+-- #!/usr/local/bin/luajit
+
 package.path = package.path..";../?.lua"
 
 local ffi = require "ffi"
@@ -23,7 +25,7 @@ local screenWidth = 640;
 local screenHeight = 480;
 
 
-local app = OpenVGApp.init(screenWidth, screenHeight);
+local app = OpenVGApp.init(screenWidth, screenHeight, 10, 10);
 
 
 local tigerModel = require "tiger";
@@ -31,7 +33,7 @@ local tigerscene = {
 	Width = screenWidth;
 	Height = screenHeight;
 	rotateN = 0.0;
-	rotateFactor = 1;
+	rotateFactor = 3;
 	ClearColor = ffi.new("VGfloat[4]", 1,1,1,1);
 
 	Elements = { 
@@ -87,6 +89,23 @@ app.OnKeyUp = function(kbd, keycode)
   	if keycode == KEY_ESC then
     		return app:Stop();
   	end
+
+	-- Move the window around the screen
+	-- using the keyboard arrow keys
+	if keycode == KEY_RIGHT then
+		local x = app.Window.X + 1;
+		local y = app.Window.Y;
+
+		return app.Window:MoveTo(x, y)
+	end
+
+	if keycode == KEY_LEFT then
+		local x = app.Window.X - 1;
+		local y = app.Window.Y;
+
+		return app.Window:MoveTo(x,y)
+	end
+
 
 	-- Change direction of rotation when space
 	-- bar is pressed

@@ -172,23 +172,28 @@ the lowest level window 'handle'.  EGL then
 uses this handle to create a managed 'window'.
 --]]
 
-local function createNativeWindow(dmxdisplay, width, height)
+local function createNativeView(dmxdisplay, width, height, x, y, level)
+    x = x or 0
+    y = y or 0
+    level = level or 0
 
-    local dst_rect = VC_RECT_T(0,0,width, height);   
+    local dst_rect = VC_RECT_T(x,y,width, height);   
     local src_rect = VC_RECT_T(0,0, lshift(width, 16), lshift(height,16));      
 
     --local alpha = VC_DISPMANX_ALPHA_T(ffi.C.DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS,255,0);
-    --local dmxview = dmxdisplay:CreateElement(dst_rect, nil, src_rect, 0, DISPMANX_PROTECTION_NONE, alpha);     
-    local dmxview = dmxdisplay:CreateElement(dst_rect, nil, src_rect);     
-    assert(dmxview, "FAILURE: Did not create dmxview");
+    --local view = dmxdisplay:CreateElement(dst_rect, nil, src_rect, 0, DISPMANX_PROTECTION_NONE, alpha);     
+    --local view = dmxdisplay:CreateElement(dst_rect, nil, src_rect); 
+    local view = dmxdisplay:CreateView(width, height, x,y, level);
+     
+    assert(view, "FAILURE: Did not create element");
 
     -- create an EGL window surface
     local nativewindow = ffi.new("EGL_DISPMANX_WINDOW_T");
-    nativewindow.element = dmxview.Handle;
+    nativewindow.element = view.Surface.Handle;
     nativewindow.width = width;
     nativewindow.height = height;
 
-    return nativewindow, dmxview;
+    return nativewindow, view;
 end
 
 
@@ -197,11 +202,14 @@ local EGLWindow_mt = {
 	__index = EGLWindow,
 }
 
-EGLWindow.new = function(width, height, config, api)
-
+EGLWindow.new = function(width, height, x, y, config, api)
+	x = x or 0
+	y = y or 0
 	config = config or {background = {153, 153, 153}};
 
 	local obj = {
+		X = x;
+		Y = y;
 		Width = width;
 		Height = height;
 	}
@@ -211,7 +219,7 @@ EGLWindow.new = function(width, height, config, api)
 
 	-- create nativewindow
 	local dmxdisplay = DMX.DMXDisplay();
-	obj.NativeWindow, obj.NativeElement = createNativeWindow(dmxdisplay, width, height);
+	obj.NativeWindow, obj.NativeView = createNativeView(dmxdisplay, width, height, x, y);
 	
 	-- create window surface
 	obj.Surface = obj.Display:CreateWindowSurface(obj.NativeWindow);
@@ -243,6 +251,17 @@ end
 EGLWindow.SwapBuffers = function(self)
 	self.Display:SwapBuffers();
 end
+
+EGLWindow.MoveTo = function(self, x, y)
+	self.NativeView:MoveTo(x,y);
+	self.X = x;
+	self.Y = y;
+
+	--self:SwapBuffers();
+end
+
+
+
 
 EGL.Display = EglDisplay
 EGL.Window = EGLWindow;

@@ -22,7 +22,7 @@ local VG = EGL.Lib;
 
 OpenVGApp = {}
 
-OpenVGApp.init = function(width, height)
+OpenVGApp.init = function(width, height, x, y)
 	width = width or 640;
 	height = height or 480;
 
@@ -36,7 +36,7 @@ OpenVGApp.init = function(width, height)
 	OpenVGApp.Keyboard.OnKeyUp = OpenVGApp.KeyUp;
 	
 	-- Create the Main Window
-	OpenVGApp.Window = EGL.Window.new(width, height, nil, EGL.EGL_OPENVG_API);
+	OpenVGApp.Window = EGL.Window.new(width, height, x,y, nil, EGL.EGL_OPENVG_API);
 
 	return OpenVGApp;
 end
