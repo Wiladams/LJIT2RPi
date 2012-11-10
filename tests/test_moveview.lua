@@ -22,7 +22,7 @@ Display:Snapshot(resource);
 local pixeldata, err = resource:ReadPixelData();
 
 
-local viewCount = 20
+local viewCount = 40
 local views = {}
 
 for i=1,viewCount do
@@ -34,24 +34,25 @@ for i=1,viewCount do
 	x = x - displayWidth/2
 	if x < 0 then
 		x = 0 
-	elseif x + displayWidth/2 > screenWidth-1 then 
+	elseif x > screenWidth-1 - (displayWidth/2)+1 then 
 		x = screenWidth-1-displayWidth 
 	end
 	
 	y = y - displayHeight/2
 	if y < 0 then 
 		y = 0 
-	elseif y + displayHeight > screenHeight-1 then 
+	elseif y > screenHeight-1 - (displayHeight/2)+1 then 
 		y = screenHeight-1-displayHeight 
 	end
 
+print(string.format("[%d, %d]", x, y));
 
 	local view = Display:CreateView(displayWidth, displayHeight, x, y)
 	view:CopyPixelBuffer(pixeldata);
 	table.insert(views, view);
 	
 	-- Wait a bit
-	--ffi.C.sleep(1);
+	ffi.C.sleep(1);
 end
 
 ffi.C.sleep(3);
