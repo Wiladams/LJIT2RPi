@@ -8,6 +8,7 @@ local band = bit.band
 
 -- Bring in the necessary UI stuff
 local rpiui = require "rpiui"
+local DMX = require "DisplayManX"
 
 local Keyboard = require "Keyboard"
 local EventLoop = require "EventLoop"
@@ -25,6 +26,9 @@ OpenVGApp = {}
 OpenVGApp.init = function(width, height, x, y)
 	width = width or 640;
 	height = height or 480;
+
+	-- Setup Display object
+	OpenVGApp.Display = DMX.DMXDisplay();
 
 	-- Setup the event loop stuff
 	OpenVGApp.Loop = EventLoop.new(15);

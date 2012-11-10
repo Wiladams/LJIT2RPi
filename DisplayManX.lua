@@ -587,6 +587,11 @@ DMXView.new = function(display, x, y, width, height, layer, pformat, resource, o
 end
 
 DMXView.CopyPixelBuffer = function(self, pbuff, x, y, width, height)
+	x = x or 0
+	y = y or 0
+	width = width or pbuff.Width;
+	height = height or pbuff.Height;
+
 	self.Resource:CopyPixelBuffer(pbuff, x, y, width, height)
 end
 
@@ -636,9 +641,9 @@ DMXView.MoveTo = function(self, x, y)
 		return false;
 	end
 
-print("DMXView.MoveTo() - ", x, y, self.Width, self.Height);
+--print("DMXView.MoveTo() - ", x, y, self.Width, self.Height);
 
-	local dst_rect = VC_RECT_T(0, 0, self.Width, self.Height);
+	local dst_rect = VC_RECT_T(x, y, self.Width, self.Height);
 	local src_rect = VC_RECT_T( 0, 0, lshift(self.Width, 16), lshift(self.Height, 16) );
 
 	self.X = x;
@@ -647,18 +652,16 @@ print("DMXView.MoveTo() - ", x, y, self.Width, self.Height);
 	local mask = 0;
 	local transform = self.Transform or ffi.C.VC_IMAGE_ROT0;
 
-print("change_flags: ", change_flags);
+--print("change_flags: ", change_flags);
 
 	local success, err = DisplayManX.element_change_attributes(update.Handle, self.Surface.Handle,
 		change_flags,
 		self.Layer,
 		self.Opacity,
-		dest_rect, 
+		dst_rect, 
 		src_rect,
 		mask,
 		transform);
-
---print("DMXView:MoveTo(), ", success, err);
 
 	update:SubmitSync();
 end

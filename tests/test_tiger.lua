@@ -21,17 +21,19 @@ local VG = EGL.Lib;
 local PS = require "PSLoader";
 
 
-local screenWidth = 640;
-local screenHeight = 480;
+local viewWidth = 640;
+local viewHeight = 480;
 
 
-local app = OpenVGApp.init(screenWidth, screenHeight, 10, 10);
 
+local app = OpenVGApp.init(viewWidth, viewHeight, 10, 10);
+
+local screenWidth, screenHeight = app.Display:GetSize();
 
 local tigerModel = require "tiger";
 local tigerscene = {
-	Width = screenWidth;
-	Height = screenHeight;
+	Width = viewWidth;
+	Height = viewHeight;
 	rotateN = 0.0;
 	rotateFactor = 3;
 	ClearColor = ffi.new("VGfloat[4]", 1,1,1,1);
@@ -83,29 +85,56 @@ app.OnIdle = function(vgapp)
 	tigerscene.rotateN = tigerscene.rotateN + (1.0 * tigerscene.rotateFactor);
 end
 
+local XIncrement = 5;
+local YIncrement = 5;
+
 app.OnKeyUp = function(kbd, keycode)
+--print("KEY: ", keycode);
 
   	-- Halt the loop if they press the "Esc" key
   	if keycode == KEY_ESC then
     		return app:Stop();
   	end
 
+	local x = app.Window.X
+	local y = app.Window.Y;
+
 	-- Move the window around the screen
 	-- using the keyboard arrow keys
 	if keycode == KEY_RIGHT then
-		local x = app.Window.X + 1;
-		local y = app.Window.Y;
-
-		return app.Window:MoveTo(x, y)
+		x = app.Window.X + XIncrement;
 	end
 
 	if keycode == KEY_LEFT then
-		local x = app.Window.X - 1;
-		local y = app.Window.Y;
-
-		return app.Window:MoveTo(x,y)
+		x = app.Window.X - XIncrement;
 	end
 
+	if keycode == KEY_HOME then
+		x = 0
+	end
+
+	if keycode == KEY_END then 
+		x = screenWidth - app.Window.Width;
+	end
+
+	if keycode == KEY_UP then
+		y = y - YIncrement;
+	end
+
+	if keycode == KEY_DOWN then
+		y = y + YIncrement
+	end
+
+	if keycode == KEY_PAGEUP then
+		y = 0;
+	end
+
+	if keycode == KEY_PAGEDOWN then
+		y = screenHeight - app.Window.Height 
+	end
+
+	-- Move the window
+	app.Window:MoveTo(x,y);
 
 	-- Change direction of rotation when space
 	-- bar is pressed
