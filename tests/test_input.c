@@ -16,7 +16,7 @@ http://www.linuxjournal.com/article/6429
 #include <linux/input.h>
 
 #define KEYBOARDEVENTS "/dev/input/event0"
-#define MOUSEEVENTS "/dev/input/event1"
+#define MOUSEEVENTS "/dev/input/event2"
 
 #define test_bit(yalv, abs_b) ((((char *)abs_b)[yalv/8] & (1<<yalv%8)) > 0)
 
@@ -483,8 +483,8 @@ int flash_keyboard(const char *devicename)
 int main (void)
 {
 	//test_device(KEYBOARDEVENTS);
-	//test_device(MOUSEEVENTS);
-	test_mouse(MOUSEEVENTS);
+	test_device(MOUSEEVENTS);
+	//test_mouse(MOUSEEVENTS);
 
 	//flash_keyboard(KEYBOARDEVENTS);
 
