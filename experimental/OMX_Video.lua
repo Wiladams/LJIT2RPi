@@ -109,7 +109,9 @@ typedef struct OMX_VIDEO_PORTDEFINITIONTYPE {
     OMX_COLOR_FORMATTYPE eColorFormat;
     OMX_NATIVE_WINDOWTYPE pNativeWindow;
 } OMX_VIDEO_PORTDEFINITIONTYPE;
+]]
 
+ffi.cdef[[
 /**  
  * Port format parameter.  This structure is used to enumerate the various 
  * data input/output format supported by the port.
@@ -135,8 +137,11 @@ typedef struct OMX_VIDEO_PARAM_PORTFORMATTYPE {
     OMX_COLOR_FORMATTYPE eColorFormat;
     OMX_U32 xFramerate;
 } OMX_VIDEO_PARAM_PORTFORMATTYPE;
+]]
 
+OMX_VIDEO_PARAM_PORTFORMATTYPE = ffi.typeof("OMX_VIDEO_PARAM_PORTFORMATTYPE");
 
+ffi.cdef[[
 /**
  * This is a structure for configuring video compression quantization 
  * parameter values.  Codecs may support different QP values for different
@@ -158,8 +163,9 @@ typedef struct OMX_VIDEO_PARAM_QUANTIZATIONTYPE {
     OMX_U32 nQpP;
     OMX_U32 nQpB;
 } OMX_VIDEO_PARAM_QUANTIZATIONTYPE;
+]]
 
-
+ffi.cdef[[
 /** 
  * Structure for configuration of video fast update parameters. 
  *  

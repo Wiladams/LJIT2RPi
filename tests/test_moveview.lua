@@ -22,7 +22,7 @@ Display:Snapshot(resource);
 local pixeldata, err = resource:ReadPixelData();
 
 
-local viewCount = 40
+local viewCount = 20
 local views = {}
 
 for i=1,viewCount do
