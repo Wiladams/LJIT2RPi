@@ -7,9 +7,7 @@ local lshift = bit.lshift
 local S = require "syscall"
 local UI = require "input"
 
-local test_bit = function(yalv, abs_b) 
-	return (band(ffi.cast("const uint8_t *",abs_b)[yalv/8], lshift(1, yalv%8)) > 0)
-end
+
 
 
 local Keyboard = {}

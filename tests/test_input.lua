@@ -1,112 +1,111 @@
 
-/*
+--[[
 References:
 http://www.linuxquestions.org/questions/linux-newbie-8/reading-mouse-device-615178/
 
 http://www.linuxjournal.com/article/6396
 http://www.linuxjournal.com/article/6429
 
-*/
+--]]
 
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+package.path = package.path..";../?.lua"
 
-#include <linux/input.h>
+local ffi = require "ffi"
+local bit = require "bit"
+local rshift = bit.rshift
+local lshift = bit.lshift
+local band = bit.band
+local bor = bit.bor
 
-#define KEYBOARDEVENTS "/dev/input/event0"
-#define MOUSEEVENTS "/dev/input/event2"
-#define JOYSTICKEVENTS "/dev/input/event2"
+local S = require "syscall"
+require "input"
 
-#define test_bit(yalv, abs_b) ((((char *)abs_b)[yalv/8] & (1<<yalv%8)) > 0)
+KEYBOARDEVENTS = "/dev/input/event0"
+MOUSEEVENTS = "/dev/input/event2"
+JOYSTICKEVENTS = "/dev/input/event2"
 
-void Listing1(fd)
-{
-	int version;
 
-	/* ioctl() accesses the underlying driver */
-	if (ioctl(fd, EVIOCGVERSION, &version)) 
-	{
-    		perror("evdev ioctl");
+function Listing1(fd)
+
+	local pversion = ffi.new("int[1]");
+
+	-- ioctl() accesses the underlying driver
+	if (not S.ioctl(fd, EVIOCGVERSION, pversion)) then
+    		return false, "evdev ioctl";
+	end
+	local version = pversion[0];
+
+	--[[
+	 the EVIOCGVERSION ioctl() returns an int 
+	 so we unpack it and display it 
+	--]]
+	print(string.format("evdev driver version: %d.%d.%d",
+       		rshift(version, 16), 
+		band(rshift(version, 8), 0xff),
+       		band(version, 0xff)));
+end
+
+
+function Listing3(fd)
+	local bustypes = {
+		[BUS_PCI]= "BUS_PCI",
+		[BUS_USB] = "BUS_USB",
+		[BUS_BLUETOOTH] = "BUS_BLUETOOTH",
 	}
 
-	/* the EVIOCGVERSION ioctl() returns an int */
-	/* so we unpack it and display it */
-	printf("evdev driver version is %d.%d.%d\n",
-       		version >> 16, (version >> 8) & 0xff,
-       		version & 0xff);
-}
+	local device_info = ffi.new("struct input_id");
 
-void Listing3(fd)
-{
-	struct input_id device_info;
+	-- suck out some device information
+	if( not S.ioctl(fd, EVIOCGID, device_info)) then 
+    		return false, "evdev ioctl";
+	end
 
-	/* suck out some device information */
-	if(ioctl(fd, EVIOCGID, &device_info)) {
-    		perror("evdev ioctl");
-	}
-
-	/* the EVIOCGID ioctl() returns input_devinfo
+	--[[ the EVIOCGID ioctl() returns input_devinfo
  	 * structure - see <linux/input.h>
  	 * So we work through the various elements,
 	 * displaying each of them
-	 */
-	printf("vendor %04hx product %04hx version %04hx",
+	 --]]
+	print(string.format("vendor %04x product %04x version %04x",
        		device_info.vendor, device_info.product,
-       		device_info.version);
+       		device_info.version));
 
-	switch ( device_info.bustype)
-	{
- 		case BUS_PCI :
-     			printf(" is on a PCI bus\n");
-     		break;
- 		case BUS_USB :
-     			printf(" is on a Universal Serial Bus\n");
-     		break;
-		case BUS_BLUETOOTH:
-			printf(" is on a Bluetooth bus\n");
-		break;
+	local bus = bustypes[device_info.bustype] or tostring(device_info.bustype);
+	print(" is on bus: ", bus);	
+end
 
-		default:
-			printf(" is a Bus\n");
+function Listing4(fd)
 
-	}
-}
+	local name = ffi.new("char[256]", "Unknown");
 
-void Listing4(fd)
-{
-	char name[256] = "Unknown";
+	if( not S.ioctl(fd, EVIOCGNAME(ffi.sizeof(name)), name)) then 
+    		return false, "evdev ioctl";
+	end
 
-	if(ioctl(fd, EVIOCGNAME(sizeof(name)), name) < 0) 
-	{
-    		perror("evdev ioctl");
-	}
-
-	printf("The device on says its name is %s\n",name);
-}
-
-void Listing5(fd)
-{
-	char phys[256] = "Unknown";
-
-	if(ioctl(fd, EVIOCGPHYS(sizeof(phys)), phys) < 0) {
-    		perror("event ioctl");
-	}
-	printf("The device says its path is: %s\n", phys);
-}
-
-void Listing6(fd)
-{
-	char uniq[256] = "NO ID";
-	if(ioctl(fd, EVIOCGUNIQ(sizeof(uniq)), uniq) < 0) {
-    		perror("event ioctl");
-	}
-
-	printf("The device says its unique ID is: %s\n", uniq);
-}
+	print("The device says its name is: ",ffi.string(name));
+end
 
 
+function Listing5(fd)
+	local phys = ffi.new("char[256]", "Unknown");
+
+	if(not S.ioctl(fd, EVIOCGPHYS(ffi.sizeof(phys)), phys)) then
+    		return false, "event ioctl";
+	end
+	print("The device says its path is: ", ffi.string(phys));
+end
+
+
+function Listing6(fd)
+
+	local uniq = ffi.new("char[256]", "Unknown");
+	if(not S.ioctl(fd, EVIOCGUNIQ(ffi.sizeof(uniq)), uniq)) then
+    		return false, "event ioctl";
+	end
+
+	print("The device says its unique ID is: ", ffi.string(uniq));
+end
+
+--[[
 /* 
 	Report what kinds of events the device can
 	deal with
@@ -441,38 +440,36 @@ void Listing17(fd)
 		}
 	}
 }
+--]]
 
 
-/*
-	Test Routines
-*/
-int test_device(const char * devicename)
-{
-	int dev;
+--  Test Routines
 
-	if ((dev = open(devicename, O_RDWR)) == -1) {
-		perror("opening device");
-		exit(EXIT_FAILURE);
-	}
+function test_device(devicename)
 
-	printf("Testing Device: %s\n", devicename);
+	local dev = S.open(devicename, S.c.O.RDWR)
+	if (not dev) then
+		S.perror("opening device");
+		return false, "EXIT FAILURE";
+	end
+
+	print("Testing Device: ", devicename);
 
 	Listing1(dev);
 	Listing3(dev);
 	Listing4(dev);
 	Listing5(dev);
 	Listing6(dev);
-	Listing7(dev);
-	//Listing8(dev);
+	--Listing7(dev);
+	--Listing8(dev);
 
 
-	close(dev);
+	dev:close();
+end
 
-	return 0;
-}
+--[[
+function test_joystick(const char *devicename)
 
-int test_joystick(const char *devicename)
-{
 	int dev;
 
 	dev = open(devicename, O_RDWR);
@@ -486,10 +483,10 @@ int test_joystick(const char *devicename)
 	close(dev);
 
 	return 0;
-}
+end
 
-int test_mouse(const char *devicename)
-{
+function test_mouse(const char *devicename)
+
 	int dev;
 
 	if ((dev = open(devicename, O_RDWR)) == -1) {
@@ -502,11 +499,11 @@ int test_mouse(const char *devicename)
 	close(dev);
 
 	return 0;
-}
+end
 
-int flash_keyboard(const char *devicename)
-{
-	int dev;
+function flash_keyboard(const char *devicename)
+
+	local dev;
 
 	if ((dev = open(devicename, O_RDWR)) == -1) {
 		perror("opening device");
@@ -517,21 +514,25 @@ int flash_keyboard(const char *devicename)
 	Listing9(dev);
 
 	return 0;
-}
+end
+--]]
 
-int main (void)
-{
-	//test_device(KEYBOARDEVENTS);
-	//flash_keyboard(KEYBOARDEVENTS);
+function main ()
+
+	--test_device(KEYBOARDEVENTS);
+	--flash_keyboard(KEYBOARDEVENTS);
 	
 	test_device(MOUSEEVENTS);
-	//test_mouse(MOUSEEVENTS);
+	--test_mouse(MOUSEEVENTS);
 	
-	//test_device(JOYSTICKEVENTS);
-	//test_joystick(JOYSTICKEVENTS);
+	--test_device(JOYSTICKEVENTS);
+	--test_joystick(JOYSTICKEVENTS);
 
 
 	
 	return 0;
-}
+end
+
+
+main();
 

@@ -8,32 +8,41 @@ local rshift = bit.rshift
 
 --[[
 #include FT_ERRORS_H
-#include FT_TYPES_H
 --]]
+
+ffi.cdef[[
+typedef signed short    FT_Int16;
+typedef unsigned short  FT_UInt16;
+typedef signed int      FT_Int32;
+typedef unsigned int    FT_UInt32;
+typedef int            	FT_Fast;
+typedef unsigned int   	FT_UFast;
+typedef int64_t		FT_INT64;
+]]
 
 -- Basic Types
 ffi.cdef[[
-typedef unsigned char  FT_Bool;
-typedef signed short  FT_FWord;   /* distance in FUnits */
-  typedef unsigned short  FT_UFWord;  /* unsigned distance */
-  typedef signed char  FT_Char;
-  typedef unsigned char  FT_Byte;
-  typedef const FT_Byte*  FT_Bytes;
-  typedef FT_UInt32  FT_Tag;
-  typedef char  FT_String;
-  typedef signed short  FT_Short;
-  typedef unsigned short  FT_UShort;
-  typedef signed int  FT_Int;
-  typedef unsigned int  FT_UInt;
-  typedef signed long  FT_Long;
-  typedef unsigned long  FT_ULong;
-  typedef signed short  FT_F2Dot14;
-  typedef signed long  FT_F26Dot6;
-  typedef signed long  FT_Fixed;
-  typedef int  FT_Error;
-  typedef void*  FT_Pointer;
-  typedef size_t  FT_Offset;
-  typedef ptrdiff_t  FT_PtrDist;
+typedef unsigned char  	FT_Bool;
+typedef signed short  	FT_FWord;   /* distance in FUnits */
+typedef unsigned short  FT_UFWord;  /* unsigned distance */
+typedef signed char  	FT_Char;
+typedef unsigned char  	FT_Byte;
+typedef const FT_Byte*  FT_Bytes;
+typedef FT_UInt32  	FT_Tag;
+typedef char  		FT_String;
+typedef signed short  	FT_Short;
+typedef unsigned short  FT_UShort;
+typedef signed int  	FT_Int;
+typedef unsigned int  	FT_UInt;
+typedef signed long  	FT_Long;
+typedef unsigned long  	FT_ULong;
+typedef signed short  	FT_F2Dot14;
+typedef signed long  	FT_F26Dot6;
+typedef signed long  	FT_Fixed;
+typedef int  		FT_Error;
+typedef void*  		FT_Pointer;
+typedef size_t  	FT_Offset;
+typedef ptrdiff_t  	FT_PtrDist;
 
 ]]
 
@@ -58,21 +67,67 @@ ffi.cdef[[
     FT_Int          length;
 
   } FT_Data;
-
-
-
 ]]
 
 ffi.cdef[[
-  typedef signed short    FT_Int16;
-  typedef unsigned short  FT_UInt16;
-  typedef signed int      FT_Int32;
-  typedef unsigned int    FT_UInt32;
-  typedef int            FT_Fast;
-  typedef unsigned int   FT_UFast;
-  typedef int64_t	FT_INT64;
+
+typedef void  (*FT_Generic_Finalizer)(void*  object);
+
+typedef struct  FT_Generic_
+{
+    void*                 data;
+    FT_Generic_Finalizer  finalizer;
+} FT_Generic;
 
 ]]
+
+function FT_MAKE_TAG(_x1, _x2, _x3, _x4)                 
+    return bor(lshift(_x1, 24), lshift(_x2,16), lshift(_x3, 8), _x4)
+end
+
+
+
+--[[
+	List Management
+--]]
+
+ffi.cdef[[
+typedef struct FT_ListNodeRec_ *  FT_ListNode;
+
+  typedef struct  FT_ListNodeRec_
+  {
+    FT_ListNode  prev;
+    FT_ListNode  next;
+    void*        data;
+
+  } FT_ListNodeRec;
+
+  typedef struct  FT_ListRec_
+  {
+    FT_ListNode  head;
+    FT_ListNode  tail;
+
+  } FT_ListRec;
+
+  typedef struct FT_ListRec_ *  FT_List;
+]]
+
+
+function FT_IS_EMPTY( list ) return (list.head == 0 ) end
+
+-- return base error code (without module-specific prefix)
+function FT_ERROR_BASE(x) return band(x, 0xFF) end
+
+-- return module error code
+function FT_ERROR_MODULE(x)  return band(x, 0xFF00) end
+
+function FT_BOOL(x)  return (x) end
+
+
+
+
+
+
 
 
 ffi.cdef[[
@@ -103,22 +158,24 @@ ffi.cdef[[
     FT_Pos    y_ppem;
 
   } FT_Bitmap_Size;
+]]
 
-  typedef struct FT_LibraryRec_  *FT_Library;
+ffi.cdef[[
+typedef struct FT_LibraryRec_  * FT_Library;
 
-  typedef struct FT_ModuleRec_*  FT_Module;
+typedef struct FT_ModuleRec_ *  	FT_Module;
 
-  typedef struct FT_DriverRec_*  FT_Driver;
+typedef struct FT_DriverRec_ *  	FT_Driver;
 
-  typedef struct FT_RendererRec_*  FT_Renderer;
+typedef struct FT_RendererRec_ *	FT_Renderer;
 
-  typedef struct FT_FaceRec_*  FT_Face;
+typedef struct FT_FaceRec_ *		FT_Face;
 
-  typedef struct FT_SizeRec_*  FT_Size;
+typedef struct FT_SizeRec_ *		FT_Size;
 
-  typedef struct FT_GlyphSlotRec_*  FT_GlyphSlot;
+typedef struct FT_GlyphSlotRec_ * 	FT_GlyphSlot;
 
-  typedef struct FT_CharMapRec_*  FT_CharMap;
+typedef struct FT_CharMapRec_ *		FT_CharMap;
 
 ]]
 
@@ -253,58 +310,71 @@ ffi.cdef[[
   } FT_FaceRec;
 ]]
 
+ffi.cdef[[
+static const int FT_FACE_FLAG_SCALABLE         = ( 1L <<  0 );
+static const int FT_FACE_FLAG_FIXED_SIZES      = ( 1L <<  1 );
+static const int FT_FACE_FLAG_FIXED_WIDTH      = ( 1L <<  2 );
+static const int FT_FACE_FLAG_SFNT             = ( 1L <<  3 );
+static const int FT_FACE_FLAG_HORIZONTAL       = ( 1L <<  4 );
+static const int FT_FACE_FLAG_VERTICAL         = ( 1L <<  5 );
+static const int FT_FACE_FLAG_KERNING          = ( 1L <<  6 );
+static const int FT_FACE_FLAG_FAST_GLYPHS      = ( 1L <<  7 );
+static const int FT_FACE_FLAG_MULTIPLE_MASTERS = ( 1L <<  8 );
+static const int FT_FACE_FLAG_GLYPH_NAMES      = ( 1L <<  9 );
+static const int FT_FACE_FLAG_EXTERNAL_STREAM  = ( 1L << 10 );
+static const int FT_FACE_FLAG_HINTER           = ( 1L << 11 );
+static const int FT_FACE_FLAG_CID_KEYED        = ( 1L << 12 );
+static const int FT_FACE_FLAG_TRICKY           = ( 1L << 13 );
+]]
 
- FT_FACE_FLAG_SCALABLE          ( 1L <<  0 )
- FT_FACE_FLAG_FIXED_SIZES       ( 1L <<  1 )
- FT_FACE_FLAG_FIXED_WIDTH       ( 1L <<  2 )
- FT_FACE_FLAG_SFNT              ( 1L <<  3 )
- FT_FACE_FLAG_HORIZONTAL        ( 1L <<  4 )
- FT_FACE_FLAG_VERTICAL          ( 1L <<  5 )
- FT_FACE_FLAG_KERNING           ( 1L <<  6 )
- FT_FACE_FLAG_FAST_GLYPHS       ( 1L <<  7 )
- FT_FACE_FLAG_MULTIPLE_MASTERS  ( 1L <<  8 )
- FT_FACE_FLAG_GLYPH_NAMES       ( 1L <<  9 )
- FT_FACE_FLAG_EXTERNAL_STREAM   ( 1L << 10 )
- FT_FACE_FLAG_HINTER            ( 1L << 11 )
- FT_FACE_FLAG_CID_KEYED         ( 1L << 12 )
- FT_FACE_FLAG_TRICKY            ( 1L << 13 )
+function FT_HAS_HORIZONTAL( face ) 
+    return band( face.face_flags, ffi.C.FT_FACE_FLAG_HORIZONTAL )
+end
 
- FT_HAS_HORIZONTAL( face ) \
-          ( face.face_flags & FT_FACE_FLAG_HORIZONTAL )
+function FT_HAS_VERTICAL( face ) 
+    return band( face.face_flags, ffi.C.FT_FACE_FLAG_VERTICAL )
+end
 
- FT_HAS_VERTICAL( face ) \
-          ( face.face_flags & FT_FACE_FLAG_VERTICAL )
+function FT_HAS_KERNING( face ) 
+    return band( face.face_flags, ffi.C.FT_FACE_FLAG_KERNING )
+end
 
- FT_HAS_KERNING( face ) \
-          ( face.face_flags & FT_FACE_FLAG_KERNING )
+function FT_IS_SCALABLE( face ) 
+    return band( face.face_flags, ffi.C.FT_FACE_FLAG_SCALABLE )
+end
 
- FT_IS_SCALABLE( face ) \
-          ( face.face_flags & FT_FACE_FLAG_SCALABLE )
+function FT_IS_SFNT( face ) 
+    return band( face.face_flags, ffi.C.FT_FACE_FLAG_SFNT )
+end
 
- FT_IS_SFNT( face ) \
-          ( face.face_flags & FT_FACE_FLAG_SFNT )
+function FT_IS_FIXED_WIDTH( face ) 
+    return band( face.face_flags, ffi.C.FT_FACE_FLAG_FIXED_WIDTH )
+end
 
- FT_IS_FIXED_WIDTH( face ) \
-          ( face.face_flags & FT_FACE_FLAG_FIXED_WIDTH )
+function FT_HAS_FIXED_SIZES( face ) 
+    return band( face.face_flags, ffi.C.FT_FACE_FLAG_FIXED_SIZES )
+end
 
- FT_HAS_FIXED_SIZES( face ) \
-          ( face.face_flags & FT_FACE_FLAG_FIXED_SIZES )
+function FT_HAS_GLYPH_NAMES( face )
+    return band( face.face_flags, ffi.C.FT_FACE_FLAG_GLYPH_NAMES )
+end
 
+function FT_HAS_MULTIPLE_MASTERS( face ) 
+    return band( face.face_flags, ffi.C.FT_FACE_FLAG_MULTIPLE_MASTERS )
+end
 
- FT_HAS_GLYPH_NAMES = function( face )
-          return ( face.face_flags & FT_FACE_FLAG_GLYPH_NAMES )
+function FT_IS_CID_KEYED( face ) 
+    return band( face.face_flags, ffi.C.FT_FACE_FLAG_CID_KEYED )
+end
 
- FT_HAS_MULTIPLE_MASTERS( face ) \
-          ( face.face_flags & FT_FACE_FLAG_MULTIPLE_MASTERS )
+function FT_IS_TRICKY( face ) 
+    return band( face.face_flags, ffi.C.FT_FACE_FLAG_TRICKY )
+end
 
- FT_IS_CID_KEYED( face ) \
-          ( face.face_flags & FT_FACE_FLAG_CID_KEYED )
-
- FT_IS_TRICKY( face ) \
-          ( face.face_flags & FT_FACE_FLAG_TRICKY )
-
- FT_STYLE_FLAG_ITALIC  ( 1 << 0 )
- FT_STYLE_FLAG_BOLD    ( 1 << 1 )
+ffi.cdef[[
+static const int FT_STYLE_FLAG_ITALIC  =( 1 << 0 );
+static const int FT_STYLE_FLAG_BOLD    =( 1 << 1 );
+]]
 
 ffi.cdef[[
   typedef struct FT_Size_InternalRec_*  FT_Size_Internal;
@@ -392,12 +462,13 @@ ffi.cdef[[
 
 ]]
 
- FT_OPEN_MEMORY    0x1
- FT_OPEN_STREAM    0x2
- FT_OPEN_PATHNAME  0x4
- FT_OPEN_DRIVER    0x8
- FT_OPEN_PARAMS    0x10
-
+ffi.cdef[[
+static const int FT_OPEN_MEMORY   = 0x01;
+static const int FT_OPEN_STREAM   = 0x02;
+static const int FT_OPEN_PATHNAME = 0x04;
+static const int FT_OPEN_DRIVER   = 0x08;
+static const int FT_OPEN_PARAMS   = 0x10;
+]]
 
 ffi.cdef[[
 
@@ -508,44 +579,27 @@ ffi.cdef[[
                 FT_Int32  load_flags );
 ]]
 
- FT_LOAD_DEFAULT                      0x0
- FT_LOAD_NO_SCALE                     ( 1L << 0 )
- FT_LOAD_NO_HINTING                   ( 1L << 1 )
- FT_LOAD_RENDER                       ( 1L << 2 )
- FT_LOAD_NO_BITMAP                    ( 1L << 3 )
- FT_LOAD_VERTICAL_LAYOUT              ( 1L << 4 )
- FT_LOAD_FORCE_AUTOHINT               ( 1L << 5 )
- FT_LOAD_CROP_BITMAP                  ( 1L << 6 )
- FT_LOAD_PEDANTIC                     ( 1L << 7 )
- FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH  ( 1L << 9 )
- FT_LOAD_NO_RECURSE                   ( 1L << 10 )
- FT_LOAD_IGNORE_TRANSFORM             ( 1L << 11 )
- FT_LOAD_MONOCHROME                   ( 1L << 12 )
- FT_LOAD_LINEAR_DESIGN                ( 1L << 13 )
- FT_LOAD_NO_AUTOHINT                  ( 1L << 15 )
+ffi.cdef[[
+static const int FT_LOAD_DEFAULT                     = 0x0;
+static const int FT_LOAD_NO_SCALE                    = ( 1L << 0 );
+static const int FT_LOAD_NO_HINTING                  = ( 1L << 1 );
+static const int FT_LOAD_RENDER                      = ( 1L << 2 );
+static const int FT_LOAD_NO_BITMAP                   = ( 1L << 3 );
+static const int FT_LOAD_VERTICAL_LAYOUT             = ( 1L << 4 );
+static const int FT_LOAD_FORCE_AUTOHINT              = ( 1L << 5 );
+static const int FT_LOAD_CROP_BITMAP                 = ( 1L << 6 );
+static const int FT_LOAD_PEDANTIC                    = ( 1L << 7 );
+static const int FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH = ( 1L << 9 );
+static const int FT_LOAD_NO_RECURSE                  = ( 1L << 10 );
+static const int FT_LOAD_IGNORE_TRANSFORM            = ( 1L << 11 );
+static const int FT_LOAD_MONOCHROME                  = ( 1L << 12 );
+static const int FT_LOAD_LINEAR_DESIGN               = ( 1L << 13 );
+static const int FT_LOAD_NO_AUTOHINT                 = ( 1L << 15 );
 
 
   /* used internally only by certain font drivers! */
- FT_LOAD_ADVANCE_ONLY                 ( 1L << 8 )
- FT_LOAD_SBITS_ONLY                   ( 1L << 14 )
-
- FT_LOAD_TARGET_( x )   ( (FT_Int32)( (x) & 15 ) << 16 )
-
- FT_LOAD_TARGET_NORMAL  FT_LOAD_TARGET_( FT_RENDER_MODE_NORMAL )
- FT_LOAD_TARGET_LIGHT   FT_LOAD_TARGET_( FT_RENDER_MODE_LIGHT  )
- FT_LOAD_TARGET_MONO    FT_LOAD_TARGET_( FT_RENDER_MODE_MONO   )
- FT_LOAD_TARGET_LCD     FT_LOAD_TARGET_( FT_RENDER_MODE_LCD    )
- FT_LOAD_TARGET_LCD_V   FT_LOAD_TARGET_( FT_RENDER_MODE_LCD_V  )
-
-
- FT_LOAD_TARGET_MODE( x )  ( (FT_Render_Mode)( ( (x) >> 16 ) & 15 ) )
-
-ffi.cdef[[
-  void
-  FT_Set_Transform( FT_Face     face,
-                    FT_Matrix*  matrix,
-                    FT_Vector*  delta );
-
+static const int FT_LOAD_ADVANCE_ONLY                = ( 1L << 8 );
+static const int FT_LOAD_SBITS_ONLY                  = ( 1L << 14 );
 
   typedef enum  FT_Render_Mode_
   {
@@ -558,12 +612,28 @@ ffi.cdef[[
     FT_RENDER_MODE_MAX
 
   } FT_Render_Mode;
+]]
 
+function FT_LOAD_TARGET_( x )  return  lshift( band(x, 15), 16) end
+
+ FT_LOAD_TARGET_NORMAL  = FT_LOAD_TARGET_( ffi.C.FT_RENDER_MODE_NORMAL )
+ FT_LOAD_TARGET_LIGHT   = FT_LOAD_TARGET_( ffi.C.FT_RENDER_MODE_LIGHT  )
+ FT_LOAD_TARGET_MONO    = FT_LOAD_TARGET_( ffi.C.FT_RENDER_MODE_MONO   )
+ FT_LOAD_TARGET_LCD     = FT_LOAD_TARGET_( ffi.C.FT_RENDER_MODE_LCD    )
+ FT_LOAD_TARGET_LCD_V   = FT_LOAD_TARGET_( ffi.C.FT_RENDER_MODE_LCD_V  )
+
+
+function FT_LOAD_TARGET_MODE( x ) return  (band(rshift(x, 16), 15)) end
+
+ffi.cdef[[
+void FT_Set_Transform( FT_Face     face,
+                    FT_Matrix*  matrix,
+                    FT_Vector*  delta );
 
 ]]
 
- ft_render_mode_normal  FT_RENDER_MODE_NORMAL
- ft_render_mode_mono    FT_RENDER_MODE_MONO
+-- ft_render_mode_normal  FT_RENDER_MODE_NORMAL
+-- ft_render_mode_mono    FT_RENDER_MODE_MONO
 
 
 ffi.cdef[[
@@ -635,14 +705,15 @@ ffi.cdef[[
 
 ]]
 
- FT_SUBGLYPH_FLAG_ARGS_ARE_WORDS          1
- FT_SUBGLYPH_FLAG_ARGS_ARE_XY_VALUES      2
- FT_SUBGLYPH_FLAG_ROUND_XY_TO_GRID        4
- FT_SUBGLYPH_FLAG_SCALE                   8
- FT_SUBGLYPH_FLAG_XY_SCALE             0x40
- FT_SUBGLYPH_FLAG_2X2                  0x80
- FT_SUBGLYPH_FLAG_USE_MY_METRICS      0x200
-
+ffi.cdef[[
+static const int FT_SUBGLYPH_FLAG_ARGS_ARE_WORDS      = 0x0001;
+static const int FT_SUBGLYPH_FLAG_ARGS_ARE_XY_VALUES  = 0x0002;
+static const int FT_SUBGLYPH_FLAG_ROUND_XY_TO_GRID    = 0x0004;
+static const int FT_SUBGLYPH_FLAG_SCALE               = 0x0008;
+static const int FT_SUBGLYPH_FLAG_XY_SCALE            = 0x0040;
+static const int FT_SUBGLYPH_FLAG_2X2                 = 0x0080;
+static const int FT_SUBGLYPH_FLAG_USE_MY_METRICS      = 0x0200;
+]]
 
 ffi.cdef[[
 
@@ -656,13 +727,14 @@ ffi.cdef[[
                         FT_Matrix    *p_transform );
 ]]
 
- FT_FSTYPE_INSTALLABLE_EMBEDDING         0x0000
- FT_FSTYPE_RESTRICTED_LICENSE_EMBEDDING  0x0002
- FT_FSTYPE_PREVIEW_AND_PRINT_EMBEDDING   0x0004
- FT_FSTYPE_EDITABLE_EMBEDDING            0x0008
- FT_FSTYPE_NO_SUBSETTING                 0x0100
- FT_FSTYPE_BITMAP_EMBEDDING_ONLY         0x0200
-
+ffi.cdef[[
+static const int FT_FSTYPE_INSTALLABLE_EMBEDDING        = 0x0000;
+static const int FT_FSTYPE_RESTRICTED_LICENSE_EMBEDDING = 0x0002;
+static const int FT_FSTYPE_PREVIEW_AND_PRINT_EMBEDDING  = 0x0004;
+static const int FT_FSTYPE_EDITABLE_EMBEDDING           = 0x0008;
+static const int FT_FSTYPE_NO_SUBSETTING                = 0x0100;
+static const int FT_FSTYPE_BITMAP_EMBEDDING_ONLY        = 0x0200;
+]]
 
 ffi.cdef[[
   FT_UShort
@@ -716,9 +788,11 @@ ffi.cdef[[
                        const FT_Matrix*  matrix );
 ]]
 
- FREETYPE_MAJOR  2
- FREETYPE_MINOR  4
- FREETYPE_PATCH  9
+ffi.cdef[[
+static const int FREETYPE_MAJOR  =2;
+static const int FREETYPE_MINOR  =4;
+static const int FREETYPE_PATCH  =9;
+]]
 
 ffi.cdef[[
   void

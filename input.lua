@@ -11,6 +11,10 @@ require "include/ioctl"
  * the Free Software Foundation.
 --]]
 
+test_bit = function(yalv, abs_b) 
+	return (band(ffi.cast("const uint8_t *",abs_b)[yalv/8], lshift(1, yalv%8)) > 0)
+end
+
 --[[
 	The event structure itself
 --]]
