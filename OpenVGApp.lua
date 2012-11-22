@@ -11,6 +11,7 @@ local rpiui = require "rpiui"
 local DMX = require "DisplayManX"
 
 local Keyboard = require "Keyboard"
+local Mouse = require ("Mouse");
 local EventLoop = require "EventLoop"
 
 local GLES = rpiui.GLES;
@@ -21,23 +22,36 @@ local VG = EGL.Lib;
 
 
 
-OpenVGApp = {}
+OpenVGApp = {
+	-- Setup Display object
+	Display = DMX.DMXDisplay();
+
+	-- Setup the event loop stuff
+	Loop = EventLoop.new(15);
+}
 
 OpenVGApp.init = function(width, height, x, y)
 	width = width or 640;
 	height = height or 480;
 
-	-- Setup Display object
-	OpenVGApp.Display = DMX.DMXDisplay();
 
-	-- Setup the event loop stuff
-	OpenVGApp.Loop = EventLoop.new(15);
+
+	-- Add the keyboard
 	OpenVGApp.Keyboard = Keyboard.new();
-
-
-	OpenVGApp.Loop:AddObservable(OpenVGApp.Keyboard);
-	OpenVGApp.Loop.OnIdle = OpenVGApp.Idle;
 	OpenVGApp.Keyboard.OnKeyUp = OpenVGApp.KeyUp;
+	OpenVGApp.Keyboard.OnKeyDown = OpenVGApp.KeyDown;
+	OpenVGApp.Loop:AddObservable(OpenVGApp.Keyboard);
+
+	-- Add the mouse
+	OpenVGApp.Mouse = Mouse.new();
+	OpenVGApp.Mouse.OnButtonPressed = OpenVGApp.MouseDown;
+	OpenVGApp.Mouse.OnButtonReleased = OpenVGApp.MouseUp;
+	OpenVGApp.Mouse.OnMouseMove = OpenVGApp.MouseMove;
+	OpenVGApp.Mouse.OnMouseWheel = OpenVGApp.MouseWheel;
+	OpenVGApp.Loop:AddObservable(OpenVGApp.Mouse);
+
+	-- Other interesting things with the loop
+	OpenVGApp.Loop.OnIdle = OpenVGApp.Idle;
 	
 	-- Create the Main Window
 	OpenVGApp.Window = EGL.Window.new(width, height, x,y, nil, EGL.EGL_OPENVG_API);
@@ -58,23 +72,58 @@ OpenVGApp.Idle = function(loop)
 	end
 end
 
+OpenVGApp.KeyDown = function(kbd, keycode)
+  	if OpenVGApp.OnKeyDown then
+		OpenVGApp.OnKeyDown(kbd, keycode);
+	end
+end
+
 OpenVGApp.KeyUp = function(kbd, keycode)
   	-- Halt the loop if they press the "Esc" key
   	if OpenVGApp.OnKeyUp then
 		OpenVGApp.OnKeyUp(kbd, keycode);
 	else
 		if keycode == KEY_ESC then
-    			OpenVGApp.Stop();
+    			OpenVGApp:Stop();
   		end
 	end
 end
 
+-- Mouse Events
+OpenVGApp.MouseDown  = function(mouse, button)
+	if OpenVGApp.OnMouseDown then
+		OpenVGApp.OnMouseDown(mouse, button);
+	end
+end
+
+OpenVGApp.MouseUp = function(mouse, button)
+	if OpenVGApp.OnMouseUp then
+		OpenVGApp.OnMouseUp(mouse, button);
+	end
+end
+
+OpenVGApp.MouseMove = function(mouse, axis, value)
+	if OpenVGApp.OnMouseMove then 
+		OpenVGApp.OnMouseMove(mouse, axis, value);
+	end
+end
+
+OpenVGApp.MouseWheel = function(mouse, value)
+	if OpenVGApp.OnMouseWheel then
+		OpenVGApp.OnMouseWheel(mouse, value);
+	end
+end
+
+
+
+-- Application Control
+
 OpenVGApp.Stop = function(self)
-	self.Loop:Halt();
+	OpenVGApp.Loop:Halt();
 end
 
 OpenVGApp.Run = function(self)
-	self.Loop:Run(15);
+	OpenVGApp.Loop:Run(15);
 end
 
 return OpenVGApp
