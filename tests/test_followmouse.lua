@@ -16,7 +16,6 @@ local starty = screenHeight/2 - viewHeight/2;
 app.Window:MoveTo(startx, starty);
 
 
-
 app.OnMouseMove = function(mouse, axis, value)
 	print("Move: ", axis, value);
 
@@ -31,10 +30,7 @@ app.OnMouseMove = function(mouse, axis, value)
 
 	-- Move the window
 	app.Window:MoveTo(x,y);
-
 end
-
-
 
 app:Run();
 
