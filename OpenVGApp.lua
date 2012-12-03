@@ -43,12 +43,15 @@ OpenVGApp.init = function(width, height, x, y)
 	OpenVGApp.Loop:AddObservable(OpenVGApp.Keyboard);
 
 	-- Add the mouse
-	OpenVGApp.Mouse = Mouse.new();
-	OpenVGApp.Mouse.OnButtonPressed = OpenVGApp.MouseDown;
-	OpenVGApp.Mouse.OnButtonReleased = OpenVGApp.MouseUp;
-	OpenVGApp.Mouse.OnMouseMove = OpenVGApp.MouseMove;
-	OpenVGApp.Mouse.OnMouseWheel = OpenVGApp.MouseWheel;
-	OpenVGApp.Loop:AddObservable(OpenVGApp.Mouse);
+	OpenVGApp.Mouse, err = Mouse.new();
+
+	if OpenVGApp.Mouse then
+		OpenVGApp.Mouse.OnButtonPressed = OpenVGApp.MouseDown;
+		OpenVGApp.Mouse.OnButtonReleased = OpenVGApp.MouseUp;
+		OpenVGApp.Mouse.OnMouseMove = OpenVGApp.MouseMove;
+		OpenVGApp.Mouse.OnMouseWheel = OpenVGApp.MouseWheel;
+		OpenVGApp.Loop:AddObservable(OpenVGApp.Mouse);
+	end
 
 	-- Other interesting things with the loop
 	OpenVGApp.Loop.OnIdle = OpenVGApp.Idle;
